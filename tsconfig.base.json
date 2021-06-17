@@ -1,6 +1,7 @@
 {
   "compileOnSave": false,
   "compilerOptions": {
+    "strict": true,
     "rootDir": ".",
     "sourceMap": true,
     "declaration": false,
@@ -15,7 +16,8 @@
     "skipDefaultLibCheck": true,
     "baseUrl": ".",
     "paths": {
-      "@nawah/js-nawah": ["libs/js-nawah/src/index.ts"]
+      "@nawah/angular": ["libs/angular/src/index.ts"],
+      "@nawah/javascript": ["libs/javascript/src/index.ts"]
     }
   },
   "exclude": ["node_modules", "tmp"]

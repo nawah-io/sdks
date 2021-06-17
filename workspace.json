@@ -1,29 +1,65 @@
 {
   "version": 2,
   "projects": {
-    "js-nawah": {
-      "root": "libs/js-nawah",
-      "sourceRoot": "libs/js-nawah/src",
+    "javascript": {
+      "root": "libs/javascript",
+      "sourceRoot": "libs/javascript/src",
       "projectType": "library",
       "targets": {
         "lint": {
           "executor": "@nrwl/linter:eslint",
           "options": {
-            "lintFilePatterns": ["libs/js-nawah/**/*.ts"]
+            "lintFilePatterns": ["libs/javascript/**/*.ts"]
           }
         },
         "test": {
           "executor": "@nrwl/jest:jest",
-          "outputs": ["coverage/libs/js-nawah"],
+          "outputs": ["coverage/libs/javascript"],
           "options": {
-            "jestConfig": "libs/js-nawah/jest.config.js",
+            "jestConfig": "libs/javascript/jest.config.js",
             "passWithNoTests": true
+          }
+        }
+      }
+    },
+    "angular": {
+      "projectType": "library",
+      "root": "libs/angular",
+      "sourceRoot": "libs/angular/src",
+      "prefix": "nawah",
+      "targets": {
+        "test": {
+          "executor": "@nrwl/jest:jest",
+          "outputs": ["coverage/libs/angular"],
+          "options": {
+            "jestConfig": "libs/angular/jest.config.js",
+            "passWithNoTests": true
+          }
+        },
+        "lint": {
+          "executor": "@nrwl/linter:eslint",
+          "options": {
+            "lintFilePatterns": [
+              "libs/angular/src/**/*.ts",
+              "libs/angular/src/**/*.html"
+            ]
           }
         }
       }
     }
   },
   "cli": {
-    "defaultCollection": "@nrwl/workspace"
+    "defaultCollection": "@nrwl/angular"
+  },
+  "generators": {
+    "@nrwl/angular:application": {
+      "linter": "eslint",
+      "unitTestRunner": "jest"
+    },
+    "@nrwl/angular:library": {
+      "linter": "eslint",
+      "unitTestRunner": "jest"
+    },
+    "@nrwl/angular:component": {}
   }
 }

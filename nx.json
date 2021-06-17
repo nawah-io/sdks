@@ -19,7 +19,10 @@
     }
   },
   "projects": {
-    "js-nawah": {
+    "angular": {
+      "tags": []
+    },
+    "javascript": {
       "tags": []
     }
   }
