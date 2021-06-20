@@ -1,0 +1,86 @@
+<h1>@nawah/javascript Test App</h1>
+
+<ul id="menu">
+  <li><a href="#tab-init">Init</a></li>
+  <li><a href="#tab-auth">Auth</a></li>
+  <li><a href="#tab3">Third tab</a></li>
+</ul>
+<div class="tab-folder">
+  <div id="tab-auth" class="tab-content">
+    <ul>
+      <li>
+        <button
+          type="button"
+          (click)="checkAuth()"
+          [disabled]="nawahInited == 'NOT_INITED' || nawahAuthed == 'AUTHED'"
+        >
+          checkAuth()
+        </button>
+      </li>
+      <li>
+        <label>Auth Val: </label>
+        <input type="email" name="email" id="email" [(ngModel)]="authVal" />
+      </li>
+      <li>
+        <label>password: </label>
+        <input
+          type="text"
+          name="password"
+          id="password"
+          [(ngModel)]="password"
+        />
+      </li>
+      <li>
+        <button
+          type="button"
+          (click)="auth()"
+          [disabled]="nawahInited == 'NOT_INITED' || nawahAuthed == 'AUTHED'"
+        >
+          auth()
+        </button>
+      </li>
+      <li>
+        <button
+          type="button"
+          (click)="signout()"
+          [disabled]="nawahAuthed == 'NOT_AUTHED'"
+        >
+          signout()
+        </button>
+      </li>
+    </ul>
+  </div>
+  <div id="tab3" class="tab-content">Content of third tab</div>
+  <div id="tab-init" class="tab-content">
+    <ul>
+      <li>
+        <label>API URI: </label>
+        <input type="text" name="api_uri" id="api_uri" [(ngModel)]="apiUri" />
+      </li>
+      <li>
+        <label>Anon Token: </label>
+        <input
+          type="text"
+          name="anon_token"
+          id="anon_token"
+          [(ngModel)]="anonToken"
+        />
+      </li>
+      <li>
+        <button type="button" (click)="init()">init()</button>
+      </li>
+    </ul>
+  </div>
+</div>
+
+<ul>
+  <ng-container *ngIf="nawahLog$ | async as nawahLog">
+    <li *ngFor="let nawahLogEntry of nawahLog">
+      {{ nawahLogEntry.datetime }}<br />
+      <details>
+        <summary>{{ nawahLogEntry.res.msg }}</summary>
+        <pre>{{ nawahLogEntry.res | json }}</pre>
+      </details>
+    </li>
+  </ng-container>
+</ul>
