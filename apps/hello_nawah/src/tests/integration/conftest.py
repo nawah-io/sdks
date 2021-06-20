@@ -1,0 +1,1 @@
+from nawah.testing.app_conftest import *
