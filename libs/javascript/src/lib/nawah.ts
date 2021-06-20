@@ -1,10 +1,10 @@
-import 'jsrsasign';
+import * as rs from 'jsrsasign';
 import {
   combineLatest,
   interval,
   Observable,
   Subject,
-  Subscription,
+  Subscription
 } from 'rxjs';
 import { webSocket } from 'rxjs/webSocket';
 import {
@@ -16,10 +16,10 @@ import {
   ResArgsMsg,
   ResArgsSession,
   SDKConfig,
-  Session,
+  Session
 } from './nawah.models';
 
-const JWS = jsrsasign.KJUR.jws.JWS;
+const JWS = rs.KJUR.jws.JWS;
 
 export enum INIT_STATE {
   NOT_INITED = 'NOT_INITED',
@@ -278,16 +278,19 @@ export class Nawah {
   }
 
   call<T extends Doc>(callArgs: CallArgs): Observable<Res<T, ResArgsDoc>> {
-    callArgs.sid = this.authed
-      ? callArgs.sid ||
+    if (this.authed == AUTH_STATE.AUTHED) {
+      callArgs.sid =
+        callArgs.sid ||
         localStorage.getItem('sid') ||
-        'f00000000000000000000012'
-      : callArgs.sid || 'f00000000000000000000012';
-    callArgs.token = this.authed
-      ? callArgs.token ||
+        'f00000000000000000000012';
+      callArgs.token =
+        callArgs.token ||
         localStorage.getItem('token') ||
-        this.#config.anonToken
-      : callArgs.token || this.#config.anonToken;
+        this.#config.anonToken;
+    } else {
+      callArgs.sid = callArgs.sid || 'f00000000000000000000012';
+      callArgs.token = callArgs.token || this.#config.anonToken;
+    }
     callArgs.query = callArgs.query || [];
     callArgs.doc = callArgs.doc || {};
     callArgs.awaitAuth = callArgs.awaitAuth || false;
@@ -352,7 +355,7 @@ export class Nawah {
     this.log('log', 'Populated filesObservables:', filesUploads);
 
     if (
-      (this.inited && callArgs.awaitAuth && this.authed) ||
+      (this.inited && callArgs.awaitAuth && this.authed == AUTH_STATE.AUTHED) ||
       (this.inited && !callArgs.awaitAuth) ||
       callArgs.endpoint == 'conn/verify'
     ) {
