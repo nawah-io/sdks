@@ -3,7 +3,7 @@
 <ul id="menu">
   <li><a href="#tab-init">Init</a></li>
   <li><a href="#tab-auth">Auth</a></li>
-  <li><a href="#tab3">Third tab</a></li>
+  <li><a href="#tab-call">Call</a></li>
 </ul>
 <div class="tab-folder">
   <div id="tab-auth" class="tab-content">
@@ -50,7 +50,49 @@
       </li>
     </ul>
   </div>
-  <div id="tab3" class="tab-content">Content of third tab</div>
+  <div id="tab-call" class="tab-content">
+    <ul>
+      <li>
+        <label>Endpoint: </label>
+        <input
+          type="text"
+          name="endpoint"
+          id="endpoint"
+          [(ngModel)]="callEndpoint"
+        />
+      </li>
+      <li>
+        <label>SID: </label>
+        <input type="text" name="sid" id="sid" [(ngModel)]="callSid" />
+      </li>
+      <li>
+        <label>Token: </label>
+        <input type="text" name="token" id="token" [(ngModel)]="callToken" />
+      </li>
+      <li>
+        <label>Query: </label>
+        <input type="text" name="query" id="query" [(ngModel)]="callQuery" />
+      </li>
+      <li>
+        <label>Doc: </label>
+        <input type="text" name="doc" id="doc" [(ngModel)]="callDoc" />
+      </li>
+      <li>
+        <label>Doc File Attr: </label>
+        <input
+          type="text"
+          name="doc_file_attr"
+          id="doc_file_attr"
+          [(ngModel)]="callDocFileAttr"
+        />
+      </li>
+      <li>
+        <label>Doc File: </label>
+        <input #callDocFileInput type="file" name="doc_file" id="doc_file" />
+      </li>
+      <li><button type="button" (click)="call()">call()</button></li>
+    </ul>
+  </div>
   <div id="tab-init" class="tab-content">
     <ul>
       <li>

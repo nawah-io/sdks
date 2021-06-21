@@ -1,4 +1,10 @@
-import { ChangeDetectionStrategy, Component, OnInit } from '@angular/core';
+import {
+  ChangeDetectionStrategy,
+  Component,
+  ElementRef,
+  OnInit,
+  ViewChild,
+} from '@angular/core';
 import {
   AUTH_STATE,
   Doc,
@@ -44,6 +50,15 @@ export class AppComponent implements OnInit {
   authVal: string = localStorage.getItem('nawah__auth_val') || '';
   password: string = localStorage.getItem('nawah__password') || '';
 
+  callEndpoint: string = '';
+  callSid: string = '';
+  callToken: string = '';
+  callQuery: string = '';
+  callDoc: string = '';
+  callDocFileAttr: string = '';
+  @ViewChild('callDocFileInput', { read: ElementRef })
+  callDocFileInput!: ElementRef;
+
   nawahLog$!: Observable<NawahLog>;
   get nawahInited(): INIT_STATE {
     return nawah.inited;
@@ -59,6 +74,10 @@ export class AppComponent implements OnInit {
   init(): void {
     localStorage.setItem('nawah__api_uri', this.apiUri);
     localStorage.setItem('nawah__anon_token', this.anonToken);
+
+    this.callSid = 'f00000000000000000000012';
+    this.callToken = this.anonToken;
+
     this.nawahLog$ = nawah
       .init({
         api: this.apiUri,
@@ -78,16 +97,42 @@ export class AppComponent implements OnInit {
   }
 
   checkAuth(): void {
-    nawah.checkAuth();
+    nawah.checkAuth().subscribe({
+      next: (res) => {
+        this.callSid = res.args.session._id;
+        this.callToken = res.args.session.token;
+      }
+    });
   }
 
   auth(): void {
     localStorage.setItem('nawah__auth_val', this.authVal);
     localStorage.setItem('nawah__password', this.password);
-    nawah.auth('email', this.authVal, this.password);
+    nawah.auth('email', this.authVal, this.password).subscribe({
+      next: (res) => {
+        this.callSid = res.args.session._id;
+        this.callToken = res.args.session.token;
+      },
+    });
   }
 
   signout(): void {
     nawah.signout();
+  }
+
+  call(): void {
+    let doc = JSON.parse(this.callDoc);
+    if (this.callDocFileAttr) {
+      let callDocFileInput = this.callDocFileInput.nativeElement;
+      eval(`doc.${this.callDocFileAttr} = callDocFileInput.files;`);
+    }
+
+    nawah.call({
+      endpoint: this.callEndpoint,
+      query: JSON.parse(this.callQuery),
+      doc: doc,
+      sid: this.callSid,
+      token: this.callToken,
+    });
   }
 }
