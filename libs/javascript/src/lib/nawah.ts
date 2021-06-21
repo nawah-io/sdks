@@ -4,9 +4,9 @@ import {
   interval,
   Observable,
   Subject,
-  Subscription
+  Subscription,
 } from 'rxjs';
-import { webSocket } from 'rxjs/webSocket';
+import { populateFilesUploads, websocketInit } from './funcs';
 import {
   CallArgs,
   Doc,
@@ -16,7 +16,7 @@ import {
   ResArgsMsg,
   ResArgsSession,
   SDKConfig,
-  Session
+  Session,
 } from './nawah.models';
 
 const JWS = rs.KJUR.jws.JWS;
@@ -42,6 +42,7 @@ export class Nawah {
 
   #heartbeat: Observable<number> = interval(30000);
   #heartbeat$!: Subscription;
+  heartbeatActive: boolean = true;
 
   #queue = {
     noAuth: new Array(),
@@ -56,6 +57,10 @@ export class Nawah {
 
   session?: Session;
 
+  _websocketInit = (nawah: Nawah, config: SDKConfig) => websocketInit(nawah, config);
+  _populateFilesUploads = (nawah: Nawah, config: SDKConfig, callArgs: CallArgs) =>
+    populateFilesUploads(nawah, config, callArgs);
+
   constructor() {
     this.inited$.subscribe({
       next: (init) => {
@@ -63,14 +68,16 @@ export class Nawah {
         if (init == INIT_STATE.INITED) {
           this.#heartbeat$ = this.#heartbeat.subscribe({
             next: (i) => {
-              this.call({ endpoint: 'heart/beat' }).subscribe({
-                complete: () => {
-                  this.log('log', 'heart beat complete..');
-                },
-                error: () => {
-                  this.log('log', 'heart beat ....');
-                },
-              });
+              if (this.heartbeatActive) {
+                this.call({ endpoint: 'heart/beat' }).subscribe({
+                  complete: () => {
+                    this.log('log', 'heart beat complete..');
+                  },
+                  error: () => {
+                    this.log('log', 'heart beat ....');
+                  },
+                });
+              }
             },
           });
           if (this.#queue.noAuth) {
@@ -194,7 +201,7 @@ export class Nawah {
     }
     this.log('log', 'Resetting SDK before init');
     this.reset();
-    this.#subject = webSocket(this.#config.api);
+    this.#subject = this._websocketInit(this, this.#config);
 
     this.log('log', 'Attempting to connect');
 
@@ -298,61 +305,7 @@ export class Nawah {
 
     this.log('log', 'callArgs', callArgs);
 
-    let files: {
-      [key: string]: FileList;
-    } = {};
-    let filesUploads: Array<Observable<Res<Doc>>> = [];
-
-    for (let attr of Object.keys(callArgs.doc)) {
-      if (callArgs.doc[attr] instanceof FileList) {
-        this.log('log', 'Detected FileList for doc attr:', attr);
-        files[attr] = callArgs.doc[attr];
-        callArgs.doc[attr] = [];
-        this.log('log', 'Attempting to read files from:', files[attr]);
-        for (let i = 0; i < files[attr].length; i++) {
-          callArgs.doc[attr].push(files[attr][i].name);
-          this.log('log', 'Attempting to read file:', i, files[attr][i]);
-          let fileUpload: Observable<Res<Doc>> = new Observable((observer) => {
-            let form: FormData = new FormData();
-            form.append('__module', callArgs.endpoint.split('/')[0]);
-            form.append('__attr', attr);
-            form.append('lastModified', files[attr][i].lastModified.toString());
-            form.append('type', files[attr][i].type);
-            form.append('name', files[attr][i].name);
-            form.append('file', files[attr][i], files[attr][i].name);
-            let xhr: XMLHttpRequest = new XMLHttpRequest();
-
-            xhr.responseType = 'json';
-
-            xhr.onload = () => {
-              callArgs.doc![attr][i] = {
-                __file: (xhr.response as Res<Doc, ResArgsDoc>).args.docs[0]._id,
-              };
-              observer.complete();
-              observer.unsubscribe();
-            };
-
-            xhr.onerror = () => {
-              observer.error(xhr.response);
-            };
-
-            xhr.open(
-              'POST',
-              `${this.#config.api
-                .replace('ws', 'http')
-                .replace('/ws', '')}/file/create`
-            );
-            xhr.setRequestHeader('X-Auth-Bearer', callArgs.sid!);
-            xhr.setRequestHeader('X-Auth-Token', callArgs.token!);
-            xhr.setRequestHeader('X-Auth-App', this.#config.appId);
-            xhr.send(form);
-          });
-          filesUploads.push(fileUpload);
-        }
-      }
-    }
-
-    this.log('log', 'Populated filesObservables:', filesUploads);
+    let filesUploads = this._populateFilesUploads(this, this.#config, callArgs);
 
     if (
       (this.inited && callArgs.awaitAuth && this.authed == AUTH_STATE.AUTHED) ||
