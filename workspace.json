@@ -7,11 +7,25 @@
       "sourceRoot": "libs/angular/src",
       "prefix": "nawah",
       "targets": {
+        "build": {
+          "executor": "@nrwl/angular:package",
+          "outputs": ["dist/libs/angular"],
+          "options": {
+            "project": "libs/angular/ng-package.json"
+          },
+          "configurations": {
+            "production": {
+              "tsConfig": "libs/angular/tsconfig.lib.prod.json"
+            },
+            "development": {
+              "tsConfig": "libs/angular/tsconfig.lib.json"
+            }
+          },
+          "defaultConfiguration": "production"
+        },
         "test": {
           "executor": "@nrwl/jest:jest",
-          "outputs": [
-            "coverage/libs/angular"
-          ],
+          "outputs": ["coverage/libs/angular"],
           "options": {
             "jestConfig": "libs/angular/jest.config.js",
             "passWithNoTests": true
@@ -29,26 +43,42 @@
       }
     },
     "javascript": {
+      "projectType": "library",
       "root": "libs/javascript",
       "sourceRoot": "libs/javascript/src",
-      "projectType": "library",
+      "prefix": "nawah",
       "targets": {
+        "build": {
+          "executor": "@nrwl/angular:package",
+          "outputs": ["dist/libs/javascript"],
+          "options": {
+            "project": "libs/javascript/ng-package.json"
+          },
+          "configurations": {
+            "production": {
+              "tsConfig": "libs/javascript/tsconfig.lib.prod.json"
+            },
+            "development": {
+              "tsConfig": "libs/javascript/tsconfig.lib.json"
+            }
+          },
+          "defaultConfiguration": "production"
+        },
+        "test": {
+          "executor": "@nrwl/jest:jest",
+          "outputs": ["coverage/libs/javascript"],
+          "options": {
+            "jestConfig": "libs/javascript/jest.config.js",
+            "passWithNoTests": true
+          }
+        },
         "lint": {
           "executor": "@nrwl/linter:eslint",
           "options": {
             "lintFilePatterns": [
-              "libs/javascript/**/*.ts"
+              "libs/javascript/src/**/*.ts",
+              "libs/javascript/src/**/*.html"
             ]
-          }
-        },
-        "test": {
-          "executor": "@nrwl/jest:jest",
-          "outputs": [
-            "coverage/libs/javascript"
-          ],
-          "options": {
-            "jestConfig": "libs/javascript/jest.config.js",
-            "passWithNoTests": true
           }
         }
       }
@@ -61,9 +91,7 @@
       "targets": {
         "build": {
           "executor": "@angular-devkit/build-angular:browser",
-          "outputs": [
-            "{options.outputPath}"
-          ],
+          "outputs": ["{options.outputPath}"],
           "options": {
             "outputPath": "dist/apps/javascript-test",
             "index": "apps/javascript-test/src/index.html",
@@ -74,9 +102,7 @@
               "apps/javascript-test/src/favicon.ico",
               "apps/javascript-test/src/assets"
             ],
-            "styles": [
-              "apps/javascript-test/src/styles.css"
-            ],
+            "styles": ["apps/javascript-test/src/styles.css"],
             "scripts": []
           },
           "configurations": {
@@ -141,9 +167,7 @@
         },
         "test": {
           "executor": "@nrwl/jest:jest",
-          "outputs": [
-            "coverage/apps/javascript-test"
-          ],
+          "outputs": ["coverage/apps/javascript-test"],
           "options": {
             "jestConfig": "apps/javascript-test/jest.config.js",
             "passWithNoTests": true
@@ -172,9 +196,7 @@
         "lint": {
           "executor": "@nrwl/linter:eslint",
           "options": {
-            "lintFilePatterns": [
-              "apps/javascript-test-e2e/**/*.{js,ts}"
-            ]
+            "lintFilePatterns": ["apps/javascript-test-e2e/**/*.{js,ts}"]
           }
         }
       }

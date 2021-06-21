@@ -1,5 +1,5 @@
 module.exports = {
-  displayName: 'ng-nawah',
+  displayName: 'angular',
   preset: '../../jest.preset.js',
   setupFilesAfterEnv: ['<rootDir>/src/test-setup.ts'],
   globals: {
@@ -8,7 +8,7 @@ module.exports = {
       stringifyContentPathRegex: '\\.(html|svg)$',
     },
   },
-  coverageDirectory: '../../coverage/libs/ng-nawah',
+  coverageDirectory: '../../coverage/libs/angular',
   transform: {
     '^.+\\.(ts|js|html)$': 'jest-preset-angular',
   },
