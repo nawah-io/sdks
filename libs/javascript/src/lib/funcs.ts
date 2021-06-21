@@ -36,8 +36,14 @@ export function populateFilesUploads(
             xhr.responseType = 'json';
 
             xhr.onload = () => {
+              let res: Res<Doc, ResArgsDoc> = xhr.response;
+              if (res.status != 200 || !res.args.count) {
+                observer.error(xhr.response);
+                return;
+              }
+
               callArgs.doc![attr][i] = {
-                __file: (xhr.response as Res<Doc, ResArgsDoc>).args.docs[0]._id,
+                __file: res.args.docs[0]._id,
               };
               observer.complete();
               observer.unsubscribe();
@@ -70,5 +76,5 @@ export function populateFilesUploads(
 }
 
 export function websocketInit(nawah: Nawah, config: SDKConfig): Subject<any> {
-    return webSocket(config.api);
+  return webSocket(config.api);
 }
