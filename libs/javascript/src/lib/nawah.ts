@@ -284,7 +284,7 @@ export class Nawah {
     } catch {}
   }
 
-  call<T extends Doc>(callArgs: CallArgs): Observable<Res<T, ResArgsDoc>> {
+  call<T extends Doc, U extends ResArgsDoc | ResArgsMsg | ResArgsSession>(callArgs: CallArgs): Observable<Res<T, U>> {
     if (this.authed == AUTH_STATE.AUTHED) {
       callArgs.sid =
         callArgs.sid ||
@@ -353,7 +353,7 @@ export class Nawah {
       }
     }
 
-    let call = new Observable<Res<T, ResArgsDoc>>((observer) => {
+    let call = new Observable<Res<T, U>>((observer) => {
       let observable = this.#conn.subscribe({
         next: (res: Res<Doc>) => {
           if ((res.args as ResArgsDoc<Doc>)?.call_id == callArgs.call_id) {
@@ -430,7 +430,7 @@ export class Nawah {
     authVal: string,
     password: string,
     groups?: Array<string>
-  ): Observable<Res<Doc>> {
+  ): Observable<Res<Doc, ResArgsSession>> {
     if (this.authed == AUTH_STATE.AUTHED)
       throw new Error('User already authed.');
     if (this.#config.authAttrs.indexOf(authVar) == -1) {
@@ -446,7 +446,7 @@ export class Nawah {
     if (groups && groups.length) {
       doc.groups = groups;
     }
-    let call = this.call({
+    let call = this.call<Doc, ResArgsSession>({
       endpoint: 'session/auth',
       doc: doc,
     });
@@ -463,7 +463,7 @@ export class Nawah {
     sid?: string,
     token?: string,
     groups?: Array<string>
-  ): Observable<Res<Doc>> {
+  ): Observable<Res<Doc, ResArgsSession>> {
     sid ??= localStorage.getItem('sid')!;
     token ??= localStorage.getItem('token')!;
 
@@ -474,7 +474,7 @@ export class Nawah {
     if (groups && groups.length) {
       query.push({ groups: groups });
     }
-    let call: Observable<Res<Doc>> = this.call({
+    let call: Observable<Res<Doc, ResArgsSession>> = this.call<Doc, ResArgsSession>({
       endpoint: 'session/reauth',
       sid: 'f00000000000000000000012',
       token: this.#config.anonToken,
@@ -506,7 +506,7 @@ export class Nawah {
     return call;
   }
 
-  checkAuth(groups?: Array<string>): Observable<Res<Doc>> {
+  checkAuth(groups?: Array<string>): Observable<Res<Doc, ResArgsSession>> {
     this.log('log', 'attempting checkAuth');
 
     let call = this.reauth(undefined, undefined, groups);
