@@ -60,14 +60,14 @@ export class Nawah {
   #websocketInit = (nawah: Nawah, config: SDKConfig) => websocketInit(nawah, config);
   #populateFilesUploads = (nawah: Nawah, config: SDKConfig, callArgs: CallArgs) =>
     populateFilesUploads(nawah, config, callArgs);
-  #cacheSet = (key: string, value: string) => localStorage.setItem(key, value);
-  #cacheGet = (key: string) => localStorage.getItem(key);
+  #cacheSet = (nawah: Nawah, config: SDKConfig, key: string, value: string) => localStorage.setItem(`nawah__${config.cacheKey}__${key}`, value);
+  #cacheGet = (nawah: Nawah, config: SDKConfig, key: string) => localStorage.getItem(`nawah__${config.cacheKey}__${key}`);
 
   constructor(callables: {
     websocketInit?: (nawah: Nawah, config: SDKConfig) => Subject<any>;
     populateFilesUploads?: (nawah: Nawah, config: SDKConfig, callArgs: CallArgs) => Array<Observable<Res<Doc, ResArgsMsg | ResArgsSession | ResArgsDoc<Doc>>>>;
-    cacheSet?: (key: string, value: string) => void;
-    cacheGet?: (key: string) => any;
+    cacheSet?: (nawah: Nawah, config: SDKConfig, key: string, value: string) => void;
+    cacheGet?: (nawah: Nawah, config: SDKConfig, key: string) => any;
   } = {}) {
     if (callables.websocketInit) {
       this.#websocketInit = callables.websocketInit;
@@ -256,10 +256,12 @@ export class Nawah {
             this.log('log', 'Session is null');
           } else {
             this.#cacheSet(
+              this, this.#config,
               'sid',
               (res.args as ResArgsSession)?.session._id
             );
             this.#cacheSet(
+              this, this.#config,
               'token',
               (res.args as ResArgsSession)?.session.token
             );
@@ -308,11 +310,11 @@ export class Nawah {
     if (this.authed == AUTH_STATE.AUTHED) {
       callArgs.sid =
         callArgs.sid ||
-        this.#cacheGet('sid') ||
+        this.#cacheGet(this, this.#config,'sid') ||
         'f00000000000000000000012';
       callArgs.token =
         callArgs.token ||
-        this.#cacheGet('token') ||
+        this.#cacheGet(this, this.#config,'token') ||
         this.#config.anonToken;
     } else {
       callArgs.sid = callArgs.sid || 'f00000000000000000000012';
@@ -484,8 +486,8 @@ export class Nawah {
     token?: string,
     groups?: Array<string>
   ): Observable<Res<Doc, ResArgsSession>> {
-    sid ??= this.#cacheGet('sid')!;
-    token ??= this.#cacheGet('token')!;
+    sid ??= this.#cacheGet(this, this.#config,'sid')!;
+    token ??= this.#cacheGet(this, this.#config,'token')!;
 
     this.authed$.next(AUTH_STATE.AUTHING);
     let query: Query = [
