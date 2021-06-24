@@ -4,7 +4,7 @@ import {
   interval,
   Observable,
   Subject,
-  Subscription,
+  Subscription
 } from 'rxjs';
 import { populateFilesUploads, websocketInit } from './funcs';
 import {
@@ -16,7 +16,7 @@ import {
   ResArgsMsg,
   ResArgsSession,
   SDKConfig,
-  Session,
+  Session
 } from './nawah.models';
 
 const JWS = rs.KJUR.jws.JWS;
@@ -57,11 +57,31 @@ export class Nawah {
 
   session?: Session;
 
-  _websocketInit = (nawah: Nawah, config: SDKConfig) => websocketInit(nawah, config);
-  _populateFilesUploads = (nawah: Nawah, config: SDKConfig, callArgs: CallArgs) =>
+  #websocketInit = (nawah: Nawah, config: SDKConfig) => websocketInit(nawah, config);
+  #populateFilesUploads = (nawah: Nawah, config: SDKConfig, callArgs: CallArgs) =>
     populateFilesUploads(nawah, config, callArgs);
+  #cacheSet = (key: string, value: string) => localStorage.setItem(key, value);
+  #cacheGet = (key: string) => localStorage.getItem(key);
 
-  constructor() {
+  constructor(callables: {
+    websocketInit?: (nawah: Nawah, config: SDKConfig) => Subject<any>;
+    populateFilesUploads?: (nawah: Nawah, config: SDKConfig, callArgs: CallArgs) => Array<Observable<Res<Doc, ResArgsMsg | ResArgsSession | ResArgsDoc<Doc>>>>;
+    cacheSet?: (key: string, value: string) => void;
+    cacheGet?: (key: string) => any;
+  } = {}) {
+    if (callables.websocketInit) {
+      this.#websocketInit = callables.websocketInit;
+    }
+    if (callables.populateFilesUploads) {
+      this.#populateFilesUploads = callables.populateFilesUploads;
+    }
+    if (callables.cacheSet) {
+      this.#cacheSet = callables.cacheSet;
+    }
+    if (callables.cacheGet) {
+      this.#cacheGet = callables.cacheGet;
+    }
+
     this.inited$.subscribe({
       next: (init) => {
         this.inited = init;
@@ -201,7 +221,7 @@ export class Nawah {
     }
     this.log('log', 'Resetting SDK before init');
     this.reset();
-    this.#subject = this._websocketInit(this, this.#config);
+    this.#subject = this.#websocketInit(this, this.#config);
 
     this.log('log', 'Attempting to connect');
 
@@ -235,11 +255,11 @@ export class Nawah {
             localStorage.removeItem('sid');
             this.log('log', 'Session is null');
           } else {
-            localStorage.setItem(
+            this.#cacheSet(
               'sid',
               (res.args as ResArgsSession)?.session._id
             );
-            localStorage.setItem(
+            this.#cacheSet(
               'token',
               (res.args as ResArgsSession)?.session.token
             );
@@ -288,11 +308,11 @@ export class Nawah {
     if (this.authed == AUTH_STATE.AUTHED) {
       callArgs.sid =
         callArgs.sid ||
-        localStorage.getItem('sid') ||
+        this.#cacheGet('sid') ||
         'f00000000000000000000012';
       callArgs.token =
         callArgs.token ||
-        localStorage.getItem('token') ||
+        this.#cacheGet('token') ||
         this.#config.anonToken;
     } else {
       callArgs.sid = callArgs.sid || 'f00000000000000000000012';
@@ -305,7 +325,7 @@ export class Nawah {
 
     this.log('log', 'callArgs', callArgs);
 
-    let filesUploads = this._populateFilesUploads(this, this.#config, callArgs);
+    let filesUploads = this.#populateFilesUploads(this, this.#config, callArgs);
 
     if (
       (this.inited && callArgs.awaitAuth && this.authed == AUTH_STATE.AUTHED) ||
@@ -464,8 +484,8 @@ export class Nawah {
     token?: string,
     groups?: Array<string>
   ): Observable<Res<Doc, ResArgsSession>> {
-    sid ??= localStorage.getItem('sid')!;
-    token ??= localStorage.getItem('token')!;
+    sid ??= this.#cacheGet('sid')!;
+    token ??= this.#cacheGet('token')!;
 
     this.authed$.next(AUTH_STATE.AUTHING);
     let query: Query = [
