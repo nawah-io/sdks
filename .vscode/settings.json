@@ -6,5 +6,16 @@
   "editor.defaultFormatter": "esbenp.prettier-vscode",
   "editor.codeActionsOnSave": {
     "source.organizeImports": true
-  }
+  },
+  "cSpell.words": [
+    "CONN",
+    "INITED",
+    "INITING",
+    "KJUR",
+    "callables",
+    "jsrsasign",
+    "nawah",
+    "reauth",
+    "signout"
+  ]
 }
