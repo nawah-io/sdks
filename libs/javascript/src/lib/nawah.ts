@@ -4,7 +4,7 @@ import {
   interval,
   Observable,
   Subject,
-  Subscription
+  Subscription,
 } from 'rxjs';
 import { populateFilesUploads, websocketInit } from './funcs';
 import {
@@ -16,7 +16,7 @@ import {
   ResArgsMsg,
   ResArgsSession,
   SDKConfig,
-  Session
+  Session,
 } from './nawah.models';
 
 const JWS = rs.KJUR.jws.JWS;
@@ -37,16 +37,20 @@ export enum AUTH_STATE {
 export class Nawah {
   #config!: SDKConfig;
 
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   #subject!: Subject<any>;
   #conn: Subject<Res<Doc>> = new Subject();
 
   #heartbeat: Observable<number> = interval(30000);
   #heartbeat$!: Subscription;
-  heartbeatActive: boolean = true;
+  heartbeatActive = true;
 
-  #queue = {
-    noAuth: new Array(),
-    auth: new Array(),
+  #queue: {
+    noAuth: Array<{ subject: Array<Observable<Res<Doc>>>; callArgs: CallArgs }>;
+    auth: Array<{ subject: Array<Observable<Res<Doc>>>; callArgs: CallArgs }>;
+  } = {
+    noAuth: [],
+    auth: [],
   };
 
   inited: INIT_STATE = INIT_STATE.NOT_INITED;
@@ -57,18 +61,42 @@ export class Nawah {
 
   session?: Session;
 
-  #websocketInit = (nawah: Nawah, config: SDKConfig) => websocketInit(nawah, config);
-  #populateFilesUploads = (nawah: Nawah, config: SDKConfig, callArgs: CallArgs) =>
-    populateFilesUploads(nawah, config, callArgs);
-  #cacheSet = (nawah: Nawah, config: SDKConfig, key: string, value: string) => localStorage.setItem(`nawah__${config.cacheKey}__${key}`, value);
-  #cacheGet = (nawah: Nawah, config: SDKConfig, key: string) => localStorage.getItem(`nawah__${config.cacheKey}__${key}`);
+  #websocketInit = (nawah: Nawah, config: SDKConfig) =>
+    websocketInit(nawah, config);
+  #populateFilesUploads = (
+    nawah: Nawah,
+    config: SDKConfig,
+    callArgs: CallArgs
+  ) => populateFilesUploads(nawah, config, callArgs);
+  #cacheSet = (nawah: Nawah, config: SDKConfig, key: string, value: string) =>
+    localStorage.setItem(`nawah__${config.cacheKey}__${key}`, value);
+  #cacheGet = (nawah: Nawah, config: SDKConfig, key: string) =>
+    localStorage.getItem(`nawah__${config.cacheKey}__${key}`) || undefined;
 
-  constructor(callables: {
-    websocketInit?: (nawah: Nawah, config: SDKConfig) => Subject<any>;
-    populateFilesUploads?: (nawah: Nawah, config: SDKConfig, callArgs: CallArgs) => Array<Observable<Res<Doc, ResArgsMsg | ResArgsSession | ResArgsDoc<Doc>>>>;
-    cacheSet?: (nawah: Nawah, config: SDKConfig, key: string, value: string) => void;
-    cacheGet?: (nawah: Nawah, config: SDKConfig, key: string) => any;
-  } = {}) {
+  constructor(
+    callables: {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      websocketInit?: (nawah: Nawah, config: SDKConfig) => Subject<any>;
+      populateFilesUploads?: (
+        nawah: Nawah,
+        config: SDKConfig,
+        callArgs: CallArgs
+      ) => Array<
+        Observable<Res<Doc, ResArgsMsg | ResArgsSession | ResArgsDoc<Doc>>>
+      >;
+      cacheSet?: (
+        nawah: Nawah,
+        config: SDKConfig,
+        key: string,
+        value: string
+      ) => void;
+      cacheGet?: (
+        nawah: Nawah,
+        config: SDKConfig,
+        key: string
+      ) => string | undefined;
+    } = {}
+  ) {
     if (callables.websocketInit) {
       this.#websocketInit = callables.websocketInit;
     }
@@ -87,7 +115,7 @@ export class Nawah {
         this.inited = init;
         if (init == INIT_STATE.INITED) {
           this.#heartbeat$ = this.#heartbeat.subscribe({
-            next: (i) => {
+            next: () => {
               if (this.heartbeatActive) {
                 this.call({ endpoint: 'heart/beat' }).subscribe({
                   complete: () => {
@@ -107,22 +135,23 @@ export class Nawah {
               this.#queue.noAuth
             );
           }
-          for (let call of this.#queue.noAuth) {
+          for (const call of this.#queue.noAuth) {
             this.log('info', 'processing noAuth call: ', call);
             combineLatest(call.subject).subscribe({
               complete: () => {
                 // Header
-                let oHeader = { alg: 'HS256', typ: 'JWT' };
+                const oHeader = { alg: 'HS256', typ: 'JWT' };
                 // Payload
-                let tNow = Math.round((new Date() as any) / 1000);
-                let tEnd = Math.round((new Date() as any) / 1000) + 86400;
-                let sHeader = JSON.stringify(oHeader);
-                let sPayload = JSON.stringify({
+                const tNow = Math.round(new Date().getUTCMilliseconds() / 1000);
+                const tEnd =
+                  Math.round(new Date().getUTCMilliseconds() / 1000) + 86400;
+                const sHeader = JSON.stringify(oHeader);
+                const sPayload = JSON.stringify({
                   ...call.callArgs,
                   iat: tNow,
                   exp: tEnd,
                 });
-                let sJWT = JWS.sign('HS256', sHeader, sPayload, {
+                const sJWT = JWS.sign('HS256', sHeader, sPayload, {
                   utf8: this.#config.anonToken,
                 });
                 this.log(
@@ -150,7 +179,7 @@ export class Nawah {
           try {
             this.#heartbeat$.unsubscribe();
           } catch (error) {
-            this.log('log', 'Hearbeat unsubcribition error');
+            this.log('log', 'Heartbeat unsubscription error.', error);
           }
         }
       },
@@ -163,23 +192,24 @@ export class Nawah {
           if (this.#queue.noAuth) {
             this.log('info', 'Found calls in auth queue:', this.#queue.auth);
           }
-          for (let call of this.#queue.auth) {
+          for (const call of this.#queue.auth) {
             this.log('info', 'processing auth call: ', call);
             combineLatest(call.subject).subscribe({
               complete: () => {
                 // Header
-                let oHeader = { alg: 'HS256', typ: 'JWT' };
+                const oHeader = { alg: 'HS256', typ: 'JWT' };
                 // Payload
-                let tNow = Math.round((new Date() as any) / 1000);
-                let tEnd = Math.round((new Date() as any) / 1000) + 86400;
-                let sHeader = JSON.stringify(oHeader);
-                let sPayload = JSON.stringify({
+                const tNow = Math.round(new Date().getUTCMilliseconds() / 1000);
+                const tEnd =
+                  Math.round(new Date().getUTCMilliseconds() / 1000) + 86400;
+                const sHeader = JSON.stringify(oHeader);
+                const sPayload = JSON.stringify({
                   ...call.callArgs,
                   iat: tNow,
                   exp: tEnd,
                 });
-                let sJWT = JWS.sign('HS256', sHeader, sPayload, {
-                  utf8: this.session!.token,
+                const sJWT = JWS.sign('HS256', sHeader, sPayload, {
+                  utf8: (this.session as Session).token,
                 });
                 this.log(
                   'info',
@@ -207,7 +237,7 @@ export class Nawah {
     });
   }
 
-  log(level: 'log' | 'info' | 'warn' | 'error', ...data: Array<any>): void {
+  log(level: 'log' | 'info' | 'warn' | 'error', ...data: Array<unknown>): void {
     if (!this.#config.debug) return;
     console[level](...data);
   }
@@ -256,12 +286,14 @@ export class Nawah {
             this.log('log', 'Session is null');
           } else {
             this.#cacheSet(
-              this, this.#config,
+              this,
+              this.#config,
               'sid',
               (res.args as ResArgsSession)?.session._id
             );
             this.#cacheSet(
-              this, this.#config,
+              this,
+              this.#config,
               'token',
               (res.args as ResArgsSession)?.session.token
             );
@@ -286,10 +318,10 @@ export class Nawah {
   }
 
   close(): Observable<Res<Doc>> {
-    let call = this.call({
+    const call = this.call({
       endpoint: 'conn/close',
     });
-    call.subscribe({ next: () => {}, error: () => {} });
+    call.subscribe({});
     return call;
   }
 
@@ -303,18 +335,22 @@ export class Nawah {
         this.session = undefined;
         this.authed$.next(AUTH_STATE.NOT_AUTHED);
       }
-    } catch {}
+    } catch (error) {
+      this.log('error', 'Unexpected error while resetting SDK.', error);
+    }
   }
 
-  call<T extends Doc, U extends ResArgsDoc | ResArgsMsg | ResArgsSession>(callArgs: CallArgs): Observable<Res<T, U>> {
+  call<T extends Doc, U extends ResArgsDoc | ResArgsMsg | ResArgsSession>(
+    callArgs: CallArgs
+  ): Observable<Res<T, U>> {
     if (this.authed == AUTH_STATE.AUTHED) {
       callArgs.sid =
         callArgs.sid ||
-        this.#cacheGet(this, this.#config,'sid') ||
+        this.#cacheGet(this, this.#config, 'sid') ||
         'f00000000000000000000012';
       callArgs.token =
         callArgs.token ||
-        this.#cacheGet(this, this.#config,'token') ||
+        this.#cacheGet(this, this.#config, 'token') ||
         this.#config.anonToken;
     } else {
       callArgs.sid = callArgs.sid || 'f00000000000000000000012';
@@ -327,7 +363,11 @@ export class Nawah {
 
     this.log('log', 'callArgs', callArgs);
 
-    let filesUploads = this.#populateFilesUploads(this, this.#config, callArgs);
+    const filesUploads = this.#populateFilesUploads(
+      this,
+      this.#config,
+      callArgs
+    );
 
     if (
       (this.inited && callArgs.awaitAuth && this.authed == AUTH_STATE.AUTHED) ||
@@ -340,14 +380,19 @@ export class Nawah {
         },
         complete: () => {
           // Header
-          let oHeader = { alg: 'HS256', typ: 'JWT' };
+          const oHeader = { alg: 'HS256', typ: 'JWT' };
           // Payload
-          let tNow = Math.round((new Date() as any) / 1000);
-          let tEnd = Math.round((new Date() as any) / 1000) + 86400;
-          let sHeader = JSON.stringify(oHeader);
-          let sPayload = JSON.stringify({ ...callArgs, iat: tNow, exp: tEnd });
-          let sJWT = JWS.sign('HS256', sHeader, sPayload, {
-            utf8: callArgs.token!,
+          const tNow = Math.round(new Date().getUTCMilliseconds() / 1000);
+          const tEnd =
+            Math.round(new Date().getUTCMilliseconds() / 1000) + 86400;
+          const sHeader = JSON.stringify(oHeader);
+          const sPayload = JSON.stringify({
+            ...callArgs,
+            iat: tNow,
+            exp: tEnd,
+          });
+          const sJWT = JWS.sign('HS256', sHeader, sPayload, {
+            utf8: callArgs.token as string,
           });
           this.log(
             'log',
@@ -375,8 +420,8 @@ export class Nawah {
       }
     }
 
-    let call = new Observable<Res<T, U>>((observer) => {
-      let observable = this.#conn.subscribe({
+    const call = new Observable<Res<T, U>>((observer) => {
+      const observable = this.#conn.subscribe({
         next: (res: Res<Doc>) => {
           if ((res.args as ResArgsDoc<Doc>)?.call_id == callArgs.call_id) {
             this.log(
@@ -386,7 +431,7 @@ export class Nawah {
               callArgs.call_id
             );
             if (res.status == 200) {
-              observer.next(res as any);
+              observer.next(res as Res<T, U>);
             } else {
               observer.error(res);
             }
@@ -419,7 +464,7 @@ export class Nawah {
   }
 
   deleteWatch(watch: string | '__all'): Observable<Res<Doc>> {
-    let call = this.call({
+    const call = this.call({
       endpoint: 'watch/delete',
       query: [{ watch: watch }],
     });
@@ -434,7 +479,7 @@ export class Nawah {
   generateAuthHash(authVar: string, authVal: string, password: string): string {
     if (this.#config.authAttrs.indexOf(authVar) == -1 && authVar != 'token') {
       throw new Error(
-        `Unkown authVar '${authVar}'. Accepted authAttrs: '${this.#config.authAttrs.join(
+        `Unknown authVar '${authVar}'. Accepted authAttrs: '${this.#config.authAttrs.join(
           ', '
         )}, token'`
       );
@@ -457,18 +502,20 @@ export class Nawah {
       throw new Error('User already authed.');
     if (this.#config.authAttrs.indexOf(authVar) == -1) {
       throw new Error(
-        `Unkown authVar '${authVar}'. Accepted authAttrs: '${this.#config.authAttrs.join(
+        `Unknown authVar '${authVar}'. Accepted authAttrs: '${this.#config.authAttrs.join(
           ', '
         )}'`
       );
     }
     this.authed$.next(AUTH_STATE.AUTHING);
-    let doc: any = { hash: this.generateAuthHash(authVar, authVal, password) };
+    const doc: { [key: string]: string | Array<string> } = {
+      hash: this.generateAuthHash(authVar, authVal, password),
+    };
     doc[authVar] = authVal;
     if (groups && groups.length) {
       doc.groups = groups;
     }
-    let call = this.call<Doc, ResArgsSession>({
+    const call = this.call<Doc, ResArgsSession>({
       endpoint: 'session/auth',
       doc: doc,
     });
@@ -486,17 +533,20 @@ export class Nawah {
     token?: string,
     groups?: Array<string>
   ): Observable<Res<Doc, ResArgsSession>> {
-    sid ??= this.#cacheGet(this, this.#config,'sid')!;
-    token ??= this.#cacheGet(this, this.#config,'token')!;
+    sid ??= this.#cacheGet(this, this.#config, 'sid');
+    token ??= this.#cacheGet(this, this.#config, 'token');
 
     this.authed$.next(AUTH_STATE.AUTHING);
-    let query: Query = [
+    const query: Query = [
       { _id: sid || 'f00000000000000000000012', token: token },
     ];
     if (groups && groups.length) {
       query.push({ groups: groups });
     }
-    let call: Observable<Res<Doc, ResArgsSession>> = this.call<Doc, ResArgsSession>({
+    const call: Observable<Res<Doc, ResArgsSession>> = this.call<
+      Doc,
+      ResArgsSession
+    >({
       endpoint: 'session/reauth',
       sid: 'f00000000000000000000012',
       token: this.#config.anonToken,
@@ -515,10 +565,11 @@ export class Nawah {
   }
 
   signout(): Observable<Res<Doc>> {
-    if (this.authed != AUTH_STATE.AUTHED) throw new Error('User not authed.');
-    let call = this.call({
+    if (this.authed != AUTH_STATE.AUTHED || !this.session)
+      throw new Error('User not authed.');
+    const call = this.call({
       endpoint: 'session/signout',
-      query: [{ _id: this.session!._id }],
+      query: [{ _id: this.session._id }],
     });
     call.subscribe({
       error: (err: Res<Doc>) => {
@@ -531,7 +582,7 @@ export class Nawah {
   checkAuth(groups?: Array<string>): Observable<Res<Doc, ResArgsSession>> {
     this.log('log', 'attempting checkAuth');
 
-    let call = this.reauth(undefined, undefined, groups);
+    const call = this.reauth(undefined, undefined, groups);
     return call;
   }
 }
