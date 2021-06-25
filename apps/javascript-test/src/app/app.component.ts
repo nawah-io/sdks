@@ -50,12 +50,12 @@ export class AppComponent implements OnInit {
   authVal: string = localStorage.getItem('nawah__auth_val') || '';
   password: string = localStorage.getItem('nawah__password') || '';
 
-  callEndpoint: string = '';
-  callSid: string = '';
-  callToken: string = '';
-  callQuery: string = '';
-  callDoc: string = '';
-  callDocFileAttr: string = '';
+  callEndpoint = '';
+  callSid = '';
+  callToken = '';
+  callQuery = '[]';
+  callDoc = '{}';
+  callDocFileAttr = '';
   @ViewChild('callDocFileInput', { read: ElementRef })
   callDocFileInput!: ElementRef;
 
@@ -101,7 +101,7 @@ export class AppComponent implements OnInit {
       next: (res) => {
         this.callSid = res.args.session._id;
         this.callToken = res.args.session.token;
-      }
+      },
     });
   }
 
@@ -121,9 +121,10 @@ export class AppComponent implements OnInit {
   }
 
   call(): void {
-    let doc = JSON.parse(this.callDoc);
+    const doc = JSON.parse(this.callDoc);
     if (this.callDocFileAttr) {
-      let callDocFileInput = this.callDocFileInput.nativeElement;
+      // eslint-disable-next-line @typescript-eslint/no-unused-vars
+      const callDocFileInput = this.callDocFileInput.nativeElement;
       eval(`doc.${this.callDocFileAttr} = callDocFileInput.files;`);
     }
 
