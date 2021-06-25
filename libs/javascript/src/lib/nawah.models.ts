@@ -112,8 +112,17 @@ export type ResArgsSession = {
   session: Session;
 };
 
-export type Res<T, U = ResArgsMsg | ResArgsDoc<T> | ResArgsSession> = {
-  args: U extends ResArgsDoc<any> ? ResArgsDoc<T> : U;
+export type Res<T> = {
+  args: {
+    code: string;
+    watch: string;
+    docs: T[];
+    count: number;
+    total: number;
+    groups: any;
+    session: Session;
+    call_id: string;
+  };
   msg: string;
   status: number;
 };

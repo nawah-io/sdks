@@ -106,9 +106,7 @@ export class Nawah {
         nawah: Nawah,
         config: SDKConfig,
         callArgs: CallArgs
-      ) => Array<
-        Observable<Res<Doc, ResArgsMsg | ResArgsSession | ResArgsDoc<Doc>>>
-      >;
+      ) => Array<Observable<Res<Doc>>>;
       cacheSet?: (
         nawah: Nawah,
         config: SDKConfig,
@@ -254,7 +252,7 @@ export class Nawah {
   }
 
   log(level: 'log' | 'info' | 'warn' | 'error', ...data: Array<unknown>): void {
-    if (!this.#config.debug) return;
+    if (!this.#config?.debug) return;
     console[level](...data);
   }
 
@@ -356,9 +354,7 @@ export class Nawah {
     }
   }
 
-  call<T extends Doc, U extends ResArgsDoc | ResArgsMsg | ResArgsSession>(
-    callArgs: CallArgs
-  ): Observable<Res<T, U>> {
+  call<T extends Doc>(callArgs: CallArgs): Observable<Res<T>> {
     if (this.authed == AUTH_STATE.AUTHED) {
       callArgs.sid =
         callArgs.sid ||
@@ -429,7 +425,7 @@ export class Nawah {
       }
     }
 
-    const call = new Observable<Res<T, U>>((observer) => {
+    const call = new Observable<Res<T>>((observer) => {
       const observable = this.#conn.subscribe({
         next: (res: Res<Doc>) => {
           if ((res.args as ResArgsDoc<Doc>)?.call_id == callArgs.call_id) {
@@ -440,7 +436,7 @@ export class Nawah {
               callArgs.call_id
             );
             if (res.status == 200) {
-              observer.next(res as Res<T, U>);
+              observer.next(res as Res<T>);
             } else {
               observer.error(res);
             }
@@ -459,7 +455,7 @@ export class Nawah {
             }
           }
         },
-        error: (err: Res<Doc, ResArgsMsg>) => {
+        error: (err: Res<Doc>) => {
           if (err.args?.call_id == callArgs.call_id) {
             observer.error(err);
           }
@@ -506,7 +502,7 @@ export class Nawah {
     authVal: string,
     password: string,
     groups?: Array<string>
-  ): Observable<Res<Doc, ResArgsSession>> {
+  ): Observable<Res<Doc>> {
     if (this.authed == AUTH_STATE.AUTHED)
       throw new Error('User already authed.');
     if (this.#config.authAttrs.indexOf(authVar) == -1) {
@@ -524,7 +520,7 @@ export class Nawah {
     if (groups && groups.length) {
       doc.groups = groups;
     }
-    const call = this.call<Doc, ResArgsSession>({
+    const call = this.call<Doc>({
       endpoint: 'session/auth',
       doc: doc,
     });
@@ -541,7 +537,7 @@ export class Nawah {
     sid?: string,
     token?: string,
     groups?: Array<string>
-  ): Observable<Res<Doc, ResArgsSession>> {
+  ): Observable<Res<Doc>> {
     sid ??= Nawah.cacheGet(this, this.#config, 'sid');
     token ??= Nawah.cacheGet(this, this.#config, 'token');
 
@@ -552,10 +548,7 @@ export class Nawah {
     if (groups && groups.length) {
       query.push({ groups: groups });
     }
-    const call: Observable<Res<Doc, ResArgsSession>> = this.call<
-      Doc,
-      ResArgsSession
-    >({
+    const call: Observable<Res<Doc>> = this.call<Doc>({
       endpoint: 'session/reauth',
       sid: 'f00000000000000000000012',
       token: this.#config.anonToken,
@@ -588,7 +581,7 @@ export class Nawah {
     return call;
   }
 
-  checkAuth(groups?: Array<string>): Observable<Res<Doc, ResArgsSession>> {
+  checkAuth(groups?: Array<string>): Observable<Res<Doc>> {
     this.log('log', 'attempting checkAuth');
 
     const call = this.reauth(undefined, undefined, groups);
