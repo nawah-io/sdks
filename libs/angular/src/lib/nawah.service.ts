@@ -39,8 +39,6 @@ export class NawahService {
     return this.activeConnection.session;
   }
 
-  constructor() {}
-
   setActiveConnection(id: number): void {
     if (id >= this.connections.length) {
       throw Error("Connection 'id' is invalid.");
@@ -50,8 +48,8 @@ export class NawahService {
   }
 
   init(config: SDKConfig): Observable<Res<Doc>> {
-    let connection: Nawah = new Nawah();
-    let connectionSubject: Observable<Res<Doc>> = connection.init(config);
+    const connection: Nawah = new Nawah();
+    const connectionSubject: Observable<Res<Doc>> = connection.init(config);
 
     this.#activeConnectionId = this.connections.length;
     this.connections.push(connection);
