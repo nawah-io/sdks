@@ -61,19 +61,44 @@ export class Nawah {
 
   session?: Session;
 
-  #websocketInit = (nawah: Nawah, config: SDKConfig) =>
+  static websocketInit = (nawah: Nawah, config: SDKConfig) =>
     websocketInit(nawah, config);
-  #populateFilesUploads = (
+  static populateFilesUploads = (
     nawah: Nawah,
     config: SDKConfig,
     callArgs: CallArgs
   ) => populateFilesUploads(nawah, config, callArgs);
-  #cacheSet = (nawah: Nawah, config: SDKConfig, key: string, value: string) =>
-    localStorage.setItem(`nawah__${config.cacheKey}__${key}`, value);
-  #cacheGet = (nawah: Nawah, config: SDKConfig, key: string) =>
+  static cacheSet = (
+    nawah: Nawah,
+    config: SDKConfig,
+    key: string,
+    value: string
+  ) => localStorage.setItem(`nawah__${config.cacheKey}__${key}`, value);
+  static cacheGet = (nawah: Nawah, config: SDKConfig, key: string) =>
     localStorage.getItem(`nawah__${config.cacheKey}__${key}`) || undefined;
+  static generateJWT = (
+    nawah: Nawah,
+    config: SDKConfig,
+    callArgs: CallArgs,
+    token: string
+  ) => {
+    const oHeader = { alg: 'HS256', typ: 'JWT' };
+    const tNow = Math.round(new Date().getTime() / 1000);
+    const tEnd = Math.round(new Date().getTime() / 1000) + 86400;
+    const sHeader = JSON.stringify(oHeader);
+    const sPayload = JSON.stringify({
+      ...callArgs,
+      iat: tNow,
+      exp: tEnd,
+    });
+    const sJWT = JWS.sign('HS256', sHeader, sPayload, {
+      utf8: token,
+    });
 
-  constructor(
+    return sJWT;
+  };
+
+  static setCallables(
     callables: {
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       websocketInit?: (nawah: Nawah, config: SDKConfig) => Subject<any>;
@@ -95,21 +120,32 @@ export class Nawah {
         config: SDKConfig,
         key: string
       ) => string | undefined;
+      generateJWT?: (
+        nawah: Nawah,
+        config: SDKConfig,
+        callArgs: CallArgs,
+        token: string
+      ) => string;
     } = {}
-  ) {
+  ): void {
     if (callables.websocketInit) {
-      this.#websocketInit = callables.websocketInit;
+      Nawah.websocketInit = callables.websocketInit;
     }
     if (callables.populateFilesUploads) {
-      this.#populateFilesUploads = callables.populateFilesUploads;
+      Nawah.populateFilesUploads = callables.populateFilesUploads;
     }
     if (callables.cacheSet) {
-      this.#cacheSet = callables.cacheSet;
+      Nawah.cacheSet = callables.cacheSet;
     }
     if (callables.cacheGet) {
-      this.#cacheGet = callables.cacheGet;
+      Nawah.cacheGet = callables.cacheGet;
     }
+    if (callables.generateJWT) {
+      Nawah.generateJWT = callables.generateJWT;
+    }
+  }
 
+  constructor() {
     this.inited$.subscribe({
       next: (init) => {
         this.inited = init;
@@ -139,21 +175,6 @@ export class Nawah {
             this.log('info', 'processing noAuth call: ', call);
             combineLatest(call.subject).subscribe({
               complete: () => {
-                // Header
-                const oHeader = { alg: 'HS256', typ: 'JWT' };
-                // Payload
-                const tNow = Math.round(new Date().getUTCMilliseconds() / 1000);
-                const tEnd =
-                  Math.round(new Date().getUTCMilliseconds() / 1000) + 86400;
-                const sHeader = JSON.stringify(oHeader);
-                const sPayload = JSON.stringify({
-                  ...call.callArgs,
-                  iat: tNow,
-                  exp: tEnd,
-                });
-                const sJWT = JWS.sign('HS256', sHeader, sPayload, {
-                  utf8: this.#config.anonToken,
-                });
                 this.log(
                   'info',
                   'sending noAuth queue request as JWT token:',
@@ -161,7 +182,12 @@ export class Nawah {
                   this.#config.anonToken
                 );
                 this.#subject.next({
-                  token: sJWT,
+                  token: Nawah.generateJWT(
+                    this,
+                    this.#config,
+                    call.callArgs,
+                    this.#config.anonToken
+                  ),
                   call_id: call.callArgs.call_id,
                 });
               },
@@ -196,21 +222,6 @@ export class Nawah {
             this.log('info', 'processing auth call: ', call);
             combineLatest(call.subject).subscribe({
               complete: () => {
-                // Header
-                const oHeader = { alg: 'HS256', typ: 'JWT' };
-                // Payload
-                const tNow = Math.round(new Date().getUTCMilliseconds() / 1000);
-                const tEnd =
-                  Math.round(new Date().getUTCMilliseconds() / 1000) + 86400;
-                const sHeader = JSON.stringify(oHeader);
-                const sPayload = JSON.stringify({
-                  ...call.callArgs,
-                  iat: tNow,
-                  exp: tEnd,
-                });
-                const sJWT = JWS.sign('HS256', sHeader, sPayload, {
-                  utf8: (this.session as Session).token,
-                });
                 this.log(
                   'info',
                   'sending auth queue request as JWT token:',
@@ -218,7 +229,12 @@ export class Nawah {
                   this.#config.anonToken
                 );
                 this.#subject.next({
-                  token: sJWT,
+                  token: Nawah.generateJWT(
+                    this,
+                    this.#config,
+                    call.callArgs,
+                    (this.session as Session).token
+                  ),
                   call_id: call.callArgs.call_id,
                 });
               },
@@ -251,7 +267,7 @@ export class Nawah {
     }
     this.log('log', 'Resetting SDK before init');
     this.reset();
-    this.#subject = this.#websocketInit(this, this.#config);
+    this.#subject = Nawah.websocketInit(this, this.#config);
 
     this.log('log', 'Attempting to connect');
 
@@ -285,13 +301,13 @@ export class Nawah {
             localStorage.removeItem('sid');
             this.log('log', 'Session is null');
           } else {
-            this.#cacheSet(
+            Nawah.cacheSet(
               this,
               this.#config,
               'sid',
               (res.args as ResArgsSession)?.session._id
             );
-            this.#cacheSet(
+            Nawah.cacheSet(
               this,
               this.#config,
               'token',
@@ -346,11 +362,11 @@ export class Nawah {
     if (this.authed == AUTH_STATE.AUTHED) {
       callArgs.sid =
         callArgs.sid ||
-        this.#cacheGet(this, this.#config, 'sid') ||
+        Nawah.cacheGet(this, this.#config, 'sid') ||
         'f00000000000000000000012';
       callArgs.token =
         callArgs.token ||
-        this.#cacheGet(this, this.#config, 'token') ||
+        Nawah.cacheGet(this, this.#config, 'token') ||
         this.#config.anonToken;
     } else {
       callArgs.sid = callArgs.sid || 'f00000000000000000000012';
@@ -363,7 +379,7 @@ export class Nawah {
 
     this.log('log', 'callArgs', callArgs);
 
-    const filesUploads = this.#populateFilesUploads(
+    const filesUploads = Nawah.populateFilesUploads(
       this,
       this.#config,
       callArgs
@@ -379,28 +395,21 @@ export class Nawah {
           this.log('error', 'Received error on filesSubjects:', err);
         },
         complete: () => {
-          // Header
-          const oHeader = { alg: 'HS256', typ: 'JWT' };
-          // Payload
-          const tNow = Math.round(new Date().getUTCMilliseconds() / 1000);
-          const tEnd =
-            Math.round(new Date().getUTCMilliseconds() / 1000) + 86400;
-          const sHeader = JSON.stringify(oHeader);
-          const sPayload = JSON.stringify({
-            ...callArgs,
-            iat: tNow,
-            exp: tEnd,
-          });
-          const sJWT = JWS.sign('HS256', sHeader, sPayload, {
-            utf8: callArgs.token as string,
-          });
           this.log(
             'log',
             'sending request as JWT token:',
             callArgs,
             callArgs.token
           );
-          this.#subject.next({ token: sJWT, call_id: callArgs.call_id });
+          this.#subject.next({
+            token: Nawah.generateJWT(
+              this,
+              this.#config,
+              callArgs,
+              callArgs.token as string
+            ),
+            call_id: callArgs.call_id,
+          });
         },
       });
     } else {
@@ -533,8 +542,8 @@ export class Nawah {
     token?: string,
     groups?: Array<string>
   ): Observable<Res<Doc, ResArgsSession>> {
-    sid ??= this.#cacheGet(this, this.#config, 'sid');
-    token ??= this.#cacheGet(this, this.#config, 'token');
+    sid ??= Nawah.cacheGet(this, this.#config, 'sid');
+    token ??= Nawah.cacheGet(this, this.#config, 'token');
 
     this.authed$.next(AUTH_STATE.AUTHING);
     const query: Query = [
