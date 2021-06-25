@@ -31,6 +31,9 @@
     "javascript-test-e2e": {
       "tags": [],
       "implicitDependencies": ["javascript-test"]
+    },
+    "nativescript": {
+      "tags": []
     }
   }
 }

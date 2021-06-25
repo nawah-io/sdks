@@ -1,0 +1,12 @@
+{
+  "name": "@nawah/nativescript",
+  "version": "0.0.1",
+  "peerDependencies": {
+    "@nativescript/background-http": "^5.0.2",
+    "@nativescript/core": "^8.0.8",
+    "nativescript-websockets": "^1.5.6"
+  },
+  "dependencies": {
+    "tslib": "^2.1.0"
+  }
+}

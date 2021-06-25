@@ -3,5 +3,6 @@ module.exports = {
     '<rootDir>/apps/javascript-test',
     '<rootDir>/libs/javascript',
     '<rootDir>/libs/angular',
+    '<rootDir>/libs/nativescript',
   ],
 };

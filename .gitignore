@@ -41,3 +41,5 @@ Thumbs.db
 apps/**/*.pyc
 apps/**/__pycache__
 apps/**/venv
+
+libs/**/node_modules

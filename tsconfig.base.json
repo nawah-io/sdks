@@ -17,7 +17,8 @@
     "baseUrl": ".",
     "paths": {
       "@nawah/angular": ["libs/angular/src/index.ts"],
-      "@nawah/javascript": ["libs/javascript/src/index.ts"]
+      "@nawah/javascript": ["libs/javascript/src/index.ts"],
+      "@nawah/nativescript": ["libs/nativescript/src/index.ts"]
     }
   },
   "exclude": ["node_modules", "tmp"]

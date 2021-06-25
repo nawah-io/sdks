@@ -200,6 +200,47 @@
           }
         }
       }
+    },
+    "nativescript": {
+      "projectType": "library",
+      "root": "libs/nativescript",
+      "sourceRoot": "libs/nativescript/src",
+      "prefix": "nawah",
+      "targets": {
+        "build": {
+          "executor": "@nrwl/angular:package",
+          "outputs": ["dist/libs/nativescript"],
+          "options": {
+            "project": "libs/nativescript/ng-package.json"
+          },
+          "configurations": {
+            "production": {
+              "tsConfig": "libs/nativescript/tsconfig.lib.prod.json"
+            },
+            "development": {
+              "tsConfig": "libs/nativescript/tsconfig.lib.json"
+            }
+          },
+          "defaultConfiguration": "production"
+        },
+        "test": {
+          "executor": "@nrwl/jest:jest",
+          "outputs": ["coverage/libs/nativescript"],
+          "options": {
+            "jestConfig": "libs/nativescript/jest.config.js",
+            "passWithNoTests": true
+          }
+        },
+        "lint": {
+          "executor": "@nrwl/linter:eslint",
+          "options": {
+            "lintFilePatterns": [
+              "libs/nativescript/src/**/*.ts",
+              "libs/nativescript/src/**/*.html"
+            ]
+          }
+        }
+      }
     }
   },
   "cli": {
