@@ -42,7 +42,20 @@ export class Nawah {
   #conn: Subject<Res<Doc>> = new Subject();
 
   #heartbeat: Observable<number> = interval(30000);
-  #heartbeat$!: Subscription;
+  #heartbeat$: Subscription = this.#heartbeat.subscribe({
+    next: () => {
+      if (this.inited == INIT_STATE.INITED && this.heartbeatActive) {
+        this.call({ endpoint: 'heart/beat' }).subscribe({
+          complete: () => {
+            this.log('log', 'heart beat complete..');
+          },
+          error: () => {
+            this.log('log', 'heart beat ....');
+          },
+        });
+      }
+    },
+  });
   heartbeatActive = true;
 
   #queue: {
@@ -76,6 +89,8 @@ export class Nawah {
   ) => localStorage.setItem(`nawah__${config.cacheKey}__${key}`, value);
   static cacheGet = (nawah: Nawah, config: SDKConfig, key: string) =>
     localStorage.getItem(`nawah__${config.cacheKey}__${key}`) || undefined;
+  static cacheRemove = (nawah: Nawah, config: SDKConfig, key: string) =>
+    localStorage.removeItem(`nawah__${config.cacheKey}__${key}`);
   static generateJWT = (
     nawah: Nawah,
     config: SDKConfig,
@@ -94,6 +109,8 @@ export class Nawah {
     const sJWT = JWS.sign('HS256', sHeader, sPayload, {
       utf8: token,
     });
+
+    nawah.log('log', 'Generated token for', callArgs.endpoint, ':', sJWT);
 
     return sJWT;
   };
@@ -118,6 +135,7 @@ export class Nawah {
         config: SDKConfig,
         key: string
       ) => string | undefined;
+      cacheRemove?: (nawah: Nawah, config: SDKConfig, key: string) => void;
       generateJWT?: (
         nawah: Nawah,
         config: SDKConfig,
@@ -138,6 +156,9 @@ export class Nawah {
     if (callables.cacheGet) {
       Nawah.cacheGet = callables.cacheGet;
     }
+    if (callables.cacheRemove) {
+      Nawah.cacheRemove = callables.cacheRemove;
+    }
     if (callables.generateJWT) {
       Nawah.generateJWT = callables.generateJWT;
     }
@@ -148,20 +169,6 @@ export class Nawah {
       next: (init) => {
         this.inited = init;
         if (init == INIT_STATE.INITED) {
-          this.#heartbeat$ = this.#heartbeat.subscribe({
-            next: () => {
-              if (this.heartbeatActive) {
-                this.call({ endpoint: 'heart/beat' }).subscribe({
-                  complete: () => {
-                    this.log('log', 'heart beat complete..');
-                  },
-                  error: () => {
-                    this.log('log', 'heart beat ....');
-                  },
-                });
-              }
-            },
-          });
           if (this.#queue.noAuth) {
             this.log(
               'info',
@@ -173,6 +180,9 @@ export class Nawah {
             this.log('info', 'processing noAuth call: ', call);
             combineLatest(call.subject).subscribe({
               complete: () => {
+                // [DOC] Set callArgs sid, token as these values are were not present when the call was queued
+                call.callArgs.sid = 'f00000000000000000000012';
+                call.callArgs.token = this.#config.anonToken;
                 this.log(
                   'info',
                   'sending noAuth queue request as JWT token:',
@@ -199,12 +209,6 @@ export class Nawah {
             });
           }
           this.#queue.noAuth = [];
-        } else {
-          try {
-            this.#heartbeat$.unsubscribe();
-          } catch (error) {
-            this.log('log', 'Heartbeat unsubscription error.', error);
-          }
         }
       },
     });
@@ -220,6 +224,9 @@ export class Nawah {
             this.log('info', 'processing auth call: ', call);
             combineLatest(call.subject).subscribe({
               complete: () => {
+                // [DOC] Set callArgs sid, token as these values are were not present when the call was queued
+                call.callArgs.sid = this.session?._id;
+                call.callArgs.token = this.session?.token;
                 this.log(
                   'info',
                   'sending auth queue request as JWT token:',
@@ -257,12 +264,15 @@ export class Nawah {
   }
 
   init(config: SDKConfig): Observable<Res<Doc>> {
-    this.#config = config;
-    this.#config.debug ??= false;
-    this.#config.cacheKey ??= Math.random().toString(36).substring(7);
-    if (this.#config.authAttrs.length == 0) {
+    if (!config.api.startsWith('ws://') && !config.api.startsWith('wss://')) {
+      throw new Error('SDK api is invalid');
+    }
+    if (config.authAttrs.length == 0) {
       throw new Error('SDK authAttrs not set');
     }
+    config.debug ??= false;
+    config.cacheKey ??= Math.random().toString(36).substring(7);
+    this.#config = config;
     this.log('log', 'Resetting SDK before init');
     this.reset();
     this.#subject = Nawah.websocketInit(this, this.#config);
@@ -278,6 +288,8 @@ export class Nawah {
           this.#config.anonToken = config.anonToken;
           this.call({
             endpoint: 'conn/verify',
+            sid: 'f00000000000000000000012',
+            token: this.#config.anonToken,
             doc: { app: config.appId },
           }).subscribe();
         } else if ((res.args as ResArgsMsg)?.code == 'CORE_CONN_OK') {
@@ -295,8 +307,8 @@ export class Nawah {
               this.authed$.next(AUTH_STATE.NOT_AUTHED);
             }
 
-            localStorage.removeItem('token');
-            localStorage.removeItem('sid');
+            Nawah.cacheRemove(this, this.#config, 'token');
+            Nawah.cacheRemove(this, this.#config, 'sid');
             this.log('log', 'Session is null');
           } else {
             Nawah.cacheSet(
@@ -335,7 +347,6 @@ export class Nawah {
     const call = this.call({
       endpoint: 'conn/close',
     });
-    call.subscribe({});
     return call;
   }
 
@@ -364,7 +375,7 @@ export class Nawah {
         callArgs.token ||
         Nawah.cacheGet(this, this.#config, 'token') ||
         this.#config.anonToken;
-    } else {
+    } else if (this.inited == INIT_STATE.INITED) {
       callArgs.sid = callArgs.sid || 'f00000000000000000000012';
       callArgs.token = callArgs.token || this.#config.anonToken;
     }
@@ -382,8 +393,10 @@ export class Nawah {
     );
 
     if (
-      (this.inited && callArgs.awaitAuth && this.authed == AUTH_STATE.AUTHED) ||
-      (this.inited && !callArgs.awaitAuth) ||
+      (this.inited == INIT_STATE.INITED &&
+        callArgs.awaitAuth &&
+        this.authed == AUTH_STATE.AUTHED) ||
+      (this.inited == INIT_STATE.INITED && !callArgs.awaitAuth) ||
       callArgs.endpoint == 'conn/verify'
     ) {
       combineLatest(filesUploads).subscribe({
@@ -557,8 +570,8 @@ export class Nawah {
     call.subscribe({
       error: (err: Res<Session>) => {
         this.log('error', 'reauth call err:', err);
-        localStorage.removeItem('token');
-        localStorage.removeItem('sid');
+        Nawah.cacheRemove(this, this.#config, 'token');
+        Nawah.cacheRemove(this, this.#config, 'sid');
         this.session = undefined;
         this.authed$.next(AUTH_STATE.NOT_AUTHED);
       },
