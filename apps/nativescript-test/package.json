@@ -1,0 +1,18 @@
+{
+  "name": "test",
+  "main": "./src/main.ts",
+  "license": "SEE LICENSE IN <your-license-filename>",
+  "version": "0.0.0",
+  "scripts": {
+    "postinstall": "node ./tools/postinstall.js"
+  },
+  "dependencies": {
+    "@nativescript/background-http": "^5.0.2",
+    "@nativescript/core": "*",
+    "nativescript-websockets": "^1.5.6"
+  },
+  "devDependencies": {
+    "@nativescript/android": "8.0.0",
+    "@nativescript/ios": "8.0.0"
+  }
+}

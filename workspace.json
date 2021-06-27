@@ -9,7 +9,9 @@
       "targets": {
         "build": {
           "executor": "@nrwl/angular:package",
-          "outputs": ["dist/libs/angular"],
+          "outputs": [
+            "dist/libs/angular"
+          ],
           "options": {
             "project": "libs/angular/ng-package.json"
           },
@@ -25,7 +27,9 @@
         },
         "test": {
           "executor": "@nrwl/jest:jest",
-          "outputs": ["coverage/libs/angular"],
+          "outputs": [
+            "coverage/libs/angular"
+          ],
           "options": {
             "jestConfig": "libs/angular/jest.config.js",
             "passWithNoTests": true
@@ -50,7 +54,9 @@
       "targets": {
         "build": {
           "executor": "@nrwl/angular:package",
-          "outputs": ["dist/libs/javascript"],
+          "outputs": [
+            "dist/libs/javascript"
+          ],
           "options": {
             "project": "libs/javascript/ng-package.json"
           },
@@ -66,7 +72,9 @@
         },
         "test": {
           "executor": "@nrwl/jest:jest",
-          "outputs": ["coverage/libs/javascript"],
+          "outputs": [
+            "coverage/libs/javascript"
+          ],
           "options": {
             "jestConfig": "libs/javascript/jest.config.js",
             "passWithNoTests": true
@@ -91,7 +99,9 @@
       "targets": {
         "build": {
           "executor": "@angular-devkit/build-angular:browser",
-          "outputs": ["{options.outputPath}"],
+          "outputs": [
+            "{options.outputPath}"
+          ],
           "options": {
             "outputPath": "dist/apps/javascript-test",
             "index": "apps/javascript-test/src/index.html",
@@ -102,7 +112,9 @@
               "apps/javascript-test/src/favicon.ico",
               "apps/javascript-test/src/assets"
             ],
-            "styles": ["apps/javascript-test/src/styles.css"],
+            "styles": [
+              "apps/javascript-test/src/styles.css"
+            ],
             "scripts": []
           },
           "configurations": {
@@ -167,7 +179,9 @@
         },
         "test": {
           "executor": "@nrwl/jest:jest",
-          "outputs": ["coverage/apps/javascript-test"],
+          "outputs": [
+            "coverage/apps/javascript-test"
+          ],
           "options": {
             "jestConfig": "apps/javascript-test/jest.config.js",
             "passWithNoTests": true
@@ -196,7 +210,9 @@
         "lint": {
           "executor": "@nrwl/linter:eslint",
           "options": {
-            "lintFilePatterns": ["apps/javascript-test-e2e/**/*.{js,ts}"]
+            "lintFilePatterns": [
+              "apps/javascript-test-e2e/**/*.{js,ts}"
+            ]
           }
         }
       }
@@ -209,7 +225,9 @@
       "targets": {
         "build": {
           "executor": "@nrwl/angular:package",
-          "outputs": ["dist/libs/nativescript"],
+          "outputs": [
+            "dist/libs/nativescript"
+          ],
           "options": {
             "project": "libs/nativescript/ng-package.json"
           },
@@ -225,7 +243,9 @@
         },
         "test": {
           "executor": "@nrwl/jest:jest",
-          "outputs": ["coverage/libs/nativescript"],
+          "outputs": [
+            "coverage/libs/nativescript"
+          ],
           "options": {
             "jestConfig": "libs/nativescript/jest.config.js",
             "passWithNoTests": true
@@ -238,6 +258,86 @@
               "libs/nativescript/src/**/*.ts",
               "libs/nativescript/src/**/*.html"
             ]
+          }
+        }
+      }
+    },
+    "nativescript-test": {
+      "projectType": "application",
+      "root": "apps/nativescript-test/",
+      "sourceRoot": "apps/nativescript-test/src",
+      "prefix": "",
+      "targets": {
+        "build": {
+          "executor": "@nativescript/nx:build",
+          "options": {
+            "noHmr": true,
+            "production": true,
+            "uglify": true,
+            "release": true,
+            "forDevice": true
+          },
+          "configurations": {
+            "prod": {
+              "fileReplacements": [
+                {
+                  "replace": "./src/environments/environment.ts",
+                  "with": "./src/environments/environment.prod.ts"
+                }
+              ]
+            }
+          }
+        },
+        "ios": {
+          "executor": "@nativescript/nx:build",
+          "options": {
+            "platform": "ios"
+          },
+          "configurations": {
+            "build": {
+              "copyTo": "./dist/build.ipa"
+            },
+            "prod": {
+              "combineWithConfig": "build:prod"
+            }
+          }
+        },
+        "android": {
+          "executor": "@nativescript/nx:build",
+          "options": {
+            "platform": "android"
+          },
+          "configurations": {
+            "build": {
+              "copyTo": "./dist/build.apk"
+            },
+            "prod": {
+              "combineWithConfig": "build:prod"
+            }
+          }
+        },
+        "clean": {
+          "executor": "@nativescript/nx:build",
+          "options": {
+            "clean": true
+          }
+        },
+        "lint": {
+          "executor": "@nrwl/linter:eslint",
+          "options": {
+            "lintFilePatterns": [
+              "apps/nativescript-test/**/*.ts",
+              "apps/nativescript-test/src/**/*.html"
+            ]
+          }
+        },
+        "test": {
+          "executor": "@nrwl/jest:jest",
+          "options": {
+            "jestConfig": "apps/nativescript-test/jest.config.js",
+            "tsConfig": "apps/nativescript-test/tsconfig.spec.json",
+            "passWithNoTests": true,
+            "setupFile": "apps/nativescript-test/src/test-setup.ts"
           }
         }
       }
