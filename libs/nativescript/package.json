@@ -1,6 +1,6 @@
 {
   "name": "@nawah/nativescript",
-  "version": "0.0.1",
+  "version": "1.0.0-beta2",
   "peerDependencies": {
     "@nativescript/background-http": "^5.0.2",
     "@nativescript/core": "^8.0.8",
