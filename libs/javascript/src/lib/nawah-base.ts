@@ -1,22 +1,21 @@
 import * as rs from 'jsrsasign';
 import {
-  combineLatest,
-  interval,
-  Observable,
-  Subject,
-  Subscription,
+    combineLatest,
+    interval,
+    Observable,
+    Subject,
+    Subscription
 } from 'rxjs';
-import { populateFilesUploads, websocketInit } from './funcs';
 import {
-  CallArgs,
-  Doc,
-  Query,
-  Res,
-  ResArgsDoc,
-  ResArgsMsg,
-  ResArgsSession,
-  SDKConfig,
-  Session,
+    CallArgs,
+    Doc,
+    Query,
+    Res,
+    ResArgsDoc,
+    ResArgsMsg,
+    ResArgsSession,
+    SDKConfig,
+    Session
 } from './nawah.models';
 
 const JWS = rs.KJUR.jws.JWS;
@@ -34,7 +33,7 @@ export enum AUTH_STATE {
   AUTHED = 'AUTHED',
 }
 
-export class Nawah {
+export class NawahBase {
   #config!: SDKConfig;
 
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -74,97 +73,75 @@ export class Nawah {
 
   session?: Session;
 
-  static websocketInit = (nawah: Nawah, config: SDKConfig) =>
-    websocketInit(nawah, config);
-  static populateFilesUploads = (
-    nawah: Nawah,
+  _websocketInit!: (nawah: NawahBase, config: SDKConfig) => Subject<any>;
+  _populateFilesUploads!: (
+    nawah: NawahBase,
     config: SDKConfig,
     callArgs: CallArgs
-  ) => populateFilesUploads(nawah, config, callArgs);
-  static cacheSet = (
-    nawah: Nawah,
+  ) => Array<Observable<Res<Doc>>>;
+  _cacheSet!: (
+    nawah: NawahBase,
     config: SDKConfig,
     key: string,
     value: string
-  ) => localStorage.setItem(`nawah__${config.cacheKey}__${key}`, value);
-  static cacheGet = (nawah: Nawah, config: SDKConfig, key: string) =>
-    localStorage.getItem(`nawah__${config.cacheKey}__${key}`) || undefined;
-  static cacheRemove = (nawah: Nawah, config: SDKConfig, key: string) =>
-    localStorage.removeItem(`nawah__${config.cacheKey}__${key}`);
-  static generateJWT = (
-    nawah: Nawah,
+  ) => void;
+  _cacheGet!: (nawah: NawahBase, config: SDKConfig, key: string) => any;
+  _cacheRemove!: (nawah: NawahBase, config: SDKConfig, key: string) =>void
+  _generateJWT!: (
+    nawah: NawahBase,
     config: SDKConfig,
     callArgs: CallArgs,
     token: string
-  ) => {
-    const oHeader = { alg: 'HS256', typ: 'JWT' };
-    const tNow = Math.round(new Date().getTime() / 1000);
-    const tEnd = Math.round(new Date().getTime() / 1000) + 86400;
-    const sHeader = JSON.stringify(oHeader);
-    const sPayload = JSON.stringify({
-      ...callArgs,
-      iat: tNow,
-      exp: tEnd,
-    });
-    const sJWT = JWS.sign('HS256', sHeader, sPayload, {
-      utf8: token,
-    });
+  ) => string;
 
-    nawah.log('log', 'Generated token for', callArgs.endpoint, ':', sJWT);
-
-    return sJWT;
-  };
-
-  static setCallables(
+  constructor(
     callables: {
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      websocketInit?: (nawah: Nawah, config: SDKConfig) => Subject<any>;
+      websocketInit?: (nawah: NawahBase, config: SDKConfig) => Subject<any>;
       populateFilesUploads?: (
-        nawah: Nawah,
+        nawah: NawahBase,
         config: SDKConfig,
         callArgs: CallArgs
       ) => Array<Observable<Res<Doc>>>;
       cacheSet?: (
-        nawah: Nawah,
+        nawah: NawahBase,
         config: SDKConfig,
         key: string,
         value: string
       ) => void;
       cacheGet?: (
-        nawah: Nawah,
+        nawah: NawahBase,
         config: SDKConfig,
         key: string
       ) => string | undefined;
-      cacheRemove?: (nawah: Nawah, config: SDKConfig, key: string) => void;
+      cacheRemove?: (nawah: NawahBase, config: SDKConfig, key: string) => void;
       generateJWT?: (
-        nawah: Nawah,
+        nawah: NawahBase,
         config: SDKConfig,
         callArgs: CallArgs,
         token: string
       ) => string;
     } = {}
-  ): void {
+  ) {
     if (callables.websocketInit) {
-      Nawah.websocketInit = callables.websocketInit;
+      this._websocketInit = callables.websocketInit;
     }
     if (callables.populateFilesUploads) {
-      Nawah.populateFilesUploads = callables.populateFilesUploads;
+      this._populateFilesUploads = callables.populateFilesUploads;
     }
     if (callables.cacheSet) {
-      Nawah.cacheSet = callables.cacheSet;
+      this._cacheSet = callables.cacheSet;
     }
     if (callables.cacheGet) {
-      Nawah.cacheGet = callables.cacheGet;
+      this._cacheGet = callables.cacheGet;
     }
     if (callables.cacheRemove) {
-      Nawah.cacheRemove = callables.cacheRemove;
+      this._cacheRemove = callables.cacheRemove;
     }
     if (callables.generateJWT) {
-      Nawah.generateJWT = callables.generateJWT;
+      this._generateJWT = callables.generateJWT;
     }
-  }
 
-  constructor() {
     this.inited$.subscribe({
       next: (init) => {
         this.inited = init;
@@ -190,7 +167,7 @@ export class Nawah {
                   this.#config.anonToken
                 );
                 this.#subject.next({
-                  token: Nawah.generateJWT(
+                  token: this._generateJWT(
                     this,
                     this.#config,
                     call.callArgs,
@@ -234,7 +211,7 @@ export class Nawah {
                   this.#config.anonToken
                 );
                 this.#subject.next({
-                  token: Nawah.generateJWT(
+                  token: this._generateJWT(
                     this,
                     this.#config,
                     call.callArgs,
@@ -275,7 +252,7 @@ export class Nawah {
     this.#config = config;
     this.log('log', 'Resetting SDK before init');
     this.reset();
-    this.#subject = Nawah.websocketInit(this, this.#config);
+    this.#subject = this._websocketInit(this, this.#config);
 
     this.log('log', 'Attempting to connect');
 
@@ -307,17 +284,17 @@ export class Nawah {
               this.authed$.next(AUTH_STATE.NOT_AUTHED);
             }
 
-            Nawah.cacheRemove(this, this.#config, 'token');
-            Nawah.cacheRemove(this, this.#config, 'sid');
+            this._cacheRemove(this, this.#config, 'token');
+            this._cacheRemove(this, this.#config, 'sid');
             this.log('log', 'Session is null');
           } else {
-            Nawah.cacheSet(
+            this._cacheSet(
               this,
               this.#config,
               'sid',
               (res.args as ResArgsSession)?.session._id
             );
-            Nawah.cacheSet(
+            this._cacheSet(
               this,
               this.#config,
               'token',
@@ -369,11 +346,11 @@ export class Nawah {
     if (this.authed == AUTH_STATE.AUTHED) {
       callArgs.sid =
         callArgs.sid ||
-        Nawah.cacheGet(this, this.#config, 'sid') ||
+        this._cacheGet(this, this.#config, 'sid') ||
         'f00000000000000000000012';
       callArgs.token =
         callArgs.token ||
-        Nawah.cacheGet(this, this.#config, 'token') ||
+        this._cacheGet(this, this.#config, 'token') ||
         this.#config.anonToken;
     } else if (this.inited == INIT_STATE.INITED) {
       callArgs.sid = callArgs.sid || 'f00000000000000000000012';
@@ -386,7 +363,7 @@ export class Nawah {
 
     this.log('log', 'callArgs', callArgs);
 
-    const filesUploads = Nawah.populateFilesUploads(
+    const filesUploads = this._populateFilesUploads(
       this,
       this.#config,
       callArgs
@@ -411,7 +388,7 @@ export class Nawah {
             callArgs.token
           );
           this.#subject.next({
-            token: Nawah.generateJWT(
+            token: this._generateJWT(
               this,
               this.#config,
               callArgs,
@@ -551,8 +528,8 @@ export class Nawah {
     token?: string,
     groups?: Array<string>
   ): Observable<Res<Doc>> {
-    sid ??= Nawah.cacheGet(this, this.#config, 'sid');
-    token ??= Nawah.cacheGet(this, this.#config, 'token');
+    sid ??= this._cacheGet(this, this.#config, 'sid');
+    token ??= this._cacheGet(this, this.#config, 'token');
 
     this.authed$.next(AUTH_STATE.AUTHING);
     const query: Query = [
@@ -570,8 +547,8 @@ export class Nawah {
     call.subscribe({
       error: (err: Res<Session>) => {
         this.log('error', 'reauth call err:', err);
-        Nawah.cacheRemove(this, this.#config, 'token');
-        Nawah.cacheRemove(this, this.#config, 'sid');
+        this._cacheRemove(this, this.#config, 'token');
+        this._cacheRemove(this, this.#config, 'sid');
         this.session = undefined;
         this.authed$.next(AUTH_STATE.NOT_AUTHED);
       },

@@ -1,10 +1,13 @@
+import * as rs from 'jsrsasign';
 import { Observable, Subject } from 'rxjs';
 import { webSocket } from 'rxjs/webSocket';
-import { Nawah } from './nawah';
+import { NawahBase } from './nawah-base';
 import { CallArgs, Doc, Res, SDKConfig } from './nawah.models';
 
+const JWS = rs.KJUR.jws.JWS;
+
 export function populateFilesUploads(
-  nawah: Nawah,
+  nawah: NawahBase,
   config: SDKConfig,
   callArgs: CallArgs
 ): Array<Observable<Res<Doc>>> {
@@ -80,6 +83,25 @@ export function populateFilesUploads(
   return filesUploads;
 }
 
-export function websocketInit(nawah: Nawah, config: SDKConfig): Subject<any> {
+export function websocketInit(nawah: NawahBase, config: SDKConfig): Subject<any> {
   return webSocket(config.api);
 }
+
+export function generateJWT(nawah: NawahBase, config: SDKConfig, callArgs: CallArgs, token: string) {
+  const oHeader = { alg: 'HS256', typ: 'JWT' };
+  const tNow = Math.round(new Date().getTime() / 1000);
+  const tEnd = Math.round(new Date().getTime() / 1000) + 86400;
+  const sHeader = JSON.stringify(oHeader);
+  const sPayload = JSON.stringify({
+    ...callArgs,
+    iat: tNow,
+    exp: tEnd,
+  });
+  const sJWT = JWS.sign('HS256', sHeader, sPayload, {
+    utf8: token,
+  });
+
+  nawah.log('log', 'Generated token for', callArgs.endpoint, ':', sJWT);
+
+  return sJWT;
+};

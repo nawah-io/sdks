@@ -1,6 +1,6 @@
 {
   "name": "@nawah/javascript",
-  "version": "1.0.0-beta1",
+  "version": "1.0.0-beta3",
   "peerDependencies": {},
   "dependencies": {
     "tslib": "^2.1.0"
