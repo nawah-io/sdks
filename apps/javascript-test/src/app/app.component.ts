@@ -5,20 +5,11 @@ import {
   OnInit,
   ViewChild,
 } from '@angular/core';
-import {
-  AUTH_STATE,
-  Doc,
-  INIT_STATE,
-  Nawah,
-  Res,
-  ResArgsDoc,
-  ResArgsMsg,
-  ResArgsSession,
-} from '@nawah/javascript';
+import { AUTH_STATE, Doc, INIT_STATE, NawahJS, Res } from '@nawah/javascript';
 import { Observable, of } from 'rxjs';
 import { filter, map, mergeScan } from 'rxjs/operators';
 
-const nawah = new Nawah();
+const nawah = new NawahJS();
 
 nawah.inited$.subscribe({
   next: (inited) => {
@@ -30,7 +21,7 @@ nawah.inited$.subscribe({
 
 interface NawahLogEntry {
   datetime: string;
-  res: Res<Doc, ResArgsMsg | ResArgsSession | ResArgsDoc<Doc>>;
+  res: Res<Doc>;
 }
 type NawahLog = Array<NawahLogEntry>;
 
@@ -87,7 +78,7 @@ export class AppComponent implements OnInit {
         debug: true,
       })
       .pipe(
-        filter((res) => (res.args as ResArgsMsg).code != 'CORE_HEARTBEAT_OK'),
+        filter((res) => res.args.code != 'CORE_HEARTBEAT_OK'),
         map((res) => ({ datetime: new Date().toISOString(), res: res })),
         mergeScan((acc, value) => {
           acc.unshift(value);
