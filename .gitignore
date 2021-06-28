@@ -38,8 +38,9 @@ testem.log
 .DS_Store
 Thumbs.db
 
+venv
+
 apps/**/*.pyc
 apps/**/__pycache__
-apps/**/venv
 
 libs/**/node_modules
