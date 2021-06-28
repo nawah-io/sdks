@@ -1,3 +1,5 @@
+export type Require<T, K extends keyof T> = T & { [P in K]: Required<P> };
+
 export interface SDKConfig {
   api: string;
   anonToken: string;
@@ -27,10 +29,10 @@ export interface QueryStep {
   };
   [attr: string]:
     | {
-        $ne: any;
+        $ne: number | string | boolean;
       }
     | {
-        $eq: any;
+        $eq: number | string | boolean;
       }
     | {
         $regex: string;
@@ -51,13 +53,13 @@ export interface QueryStep {
         $bet: [number, number] | [string, string];
       }
     | {
-        $all: Array<any>;
+        $all: Array<number | string>;
       }
     | {
-        $nin: Array<any>;
+        $nin: Array<number | string>;
       }
     | {
-        $in: Array<any>;
+        $in: Array<number | string>;
       }
     | {
         $attrs: Array<string>;
@@ -79,6 +81,7 @@ export interface QueryStep {
     | undefined;
 }
 
+// eslint-disable-next-line @typescript-eslint/no-empty-interface
 export interface Query extends Array<QueryStep | Query> {}
 
 export interface CallArgs {
@@ -87,32 +90,46 @@ export interface CallArgs {
   sid?: string;
   token?: string;
   query?: Query;
-  doc?: {
-    [attr: string]: any;
-  };
+  doc?: { [key: string]: unknown };
+  // doc?: {
+  //   [key: string]:
+  //     | number
+  //     | string
+  //     | boolean
+  //     | Doc
+  //     | DocAttrDict
+  //     | DocAttrArray
+  //     | { $add: number }
+  //     | { $multiply: number }
+  //     | {
+  //         $append: number | string | boolean | Doc | DocAttrDict | DocAttrArray;
+  //       }
+  //     | {
+  //         $set_index: {
+  //           [key: number]:
+  //             | number
+  //             | string
+  //             | boolean
+  //             | Doc
+  //             | DocAttrDict
+  //             | DocAttrArray;
+  //         };
+  //       }
+  //     | {
+  //         $del_val:
+  //           | number
+  //           | string
+  //           | boolean
+  //           | Doc
+  //           | DocAttrDict
+  //           | DocAttrArray;
+  //       }
+  //     | { $del_index: number };
+  // };
   awaitAuth?: boolean;
 }
 
-export type ResArgsDoc<T = any> = {
-  call_id: string;
-  watch?: string;
-  docs: Array<T>;
-  count: number;
-  total: number;
-  groups: any;
-};
-
-export type ResArgsMsg = {
-  call_id: string;
-  code: string;
-};
-
-export type ResArgsSession = {
-  call_id: string;
-  session: Session;
-};
-
-export type Res<T> = {
+export interface Res<T> {
   args: {
     code: string;
     watch: string;
@@ -129,7 +146,15 @@ export type Res<T> = {
 
 export interface Doc {
   _id: string;
-  [key: string]: any;
+  [key: string]: number | string | boolean | Doc | DocAttrDict | DocAttrArray;
+}
+
+export interface DocAttrDict {
+  [key: string]: number | string | boolean | Doc | DocAttrDict | DocAttrArray;
+}
+
+export interface DocAttrArray {
+  [key: number]: number | string | boolean | Doc | DocAttrDict | DocAttrArray;
 }
 
 export interface Session extends Doc {
