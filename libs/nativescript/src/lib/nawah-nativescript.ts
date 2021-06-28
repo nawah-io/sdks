@@ -1,6 +1,13 @@
 import { session } from '@nativescript/background-http';
 import { ApplicationSettings, File } from '@nativescript/core';
-import { CallArgs, Doc, NawahBase, Res, SDKConfig } from '@nawah/javascript';
+import {
+  CallArgs,
+  Doc,
+  NawahBase,
+  Require,
+  Res,
+  SDKConfig,
+} from '@nawah/javascript';
 import * as rs from 'jsrsasign';
 import { Observable } from 'rxjs';
 import { webSocket } from 'rxjs/webSocket';
@@ -10,6 +17,15 @@ const JWS = rs.KJUR.jws.JWS;
 export class NawahNS extends NawahBase {
   constructor() {
     super({
+      log: (
+        nawah: NawahNS,
+        config: SDKConfig,
+        level: 'log' | 'info' | 'warn' | 'error',
+        ...values: Array<unknown>
+      ) => {
+        if (!config?.debug) return;
+        console.log(`[${level}]`, ...values);
+      },
       websocketInit: (nawah: NawahBase, config: SDKConfig) => {
         require('nativescript-websockets');
         return webSocket(config.api);
@@ -41,14 +57,22 @@ export class NawahNS extends NawahBase {
           utf8: token,
         });
 
-        nawah.log('log', 'Generated token for', callArgs.endpoint, ':', sJWT);
+        nawah._log(
+          nawah,
+          config,
+          'log',
+          'Generated token for',
+          callArgs.endpoint,
+          ':',
+          sJWT
+        );
 
         return sJWT;
       },
       populateFilesUploads: (
         nawah: NawahBase,
         config: SDKConfig,
-        callArgs: CallArgs
+        callArgs: Require<CallArgs, 'sid' | 'token' | 'doc'>
       ) => {
         if (!callArgs.doc) return [];
         const files: { [key: string]: Array<File> } = {};
@@ -57,17 +81,33 @@ export class NawahNS extends NawahBase {
           // [DOC] Assert valid type before checking
           if (
             callArgs.doc[attr] instanceof Array &&
-            callArgs.doc[attr].length &&
-            callArgs.doc[attr][0] instanceof File
+            (callArgs.doc[attr] as Array<unknown>).length &&
+            (callArgs.doc[attr] as Array<unknown>)[0] instanceof File
           ) {
-            nawah.log('log', 'Detected File for doc attr: ', attr);
-            files[attr] = callArgs.doc[attr];
+            nawah._log(
+              nawah,
+              config,
+              'log',
+              'Detected File for doc attr: ',
+              attr
+            );
+            files[attr] = callArgs.doc[attr] as Array<File>;
             callArgs.doc[attr] = [];
 
-            nawah.log('log', 'Attempting to read files from:', files[attr]);
+            nawah._log(
+              nawah,
+              config,
+              'log',
+              'Attempting to read files from:',
+              files[attr]
+            );
             for (const i of Object.keys(files[attr])) {
-              callArgs.doc[attr].push(files[attr][Number(i)].name);
-              nawah.log(
+              (callArgs.doc[attr] as Array<unknown>).push(
+                files[attr][Number(i)].name
+              );
+              nawah._log(
+                nawah,
+                config,
                 'log',
                 'Attempting to read file:',
                 i,
@@ -119,11 +159,16 @@ export class NawahNS extends NawahBase {
                   ).multipartUpload(params, request);
 
                   task.on('complete', () => {
-                    nawah.log('log', 'File uploaded.... complete');
+                    nawah._log(
+                      nawah,
+                      config,
+                      'log',
+                      'File uploaded.... complete'
+                    );
                   });
 
                   task.on('responded', (e) => {
-                    nawah.log('log', 'File uploaded....');
+                    nawah._log(nawah, config, 'log', 'File uploaded....');
                     const res: Res<Doc> = JSON.parse(e.data);
                     // eslint-disable-next-line @typescript-eslint/no-explicit-any
                     (callArgs as any).doc[attr][i] = {
@@ -134,7 +179,9 @@ export class NawahNS extends NawahBase {
                   });
 
                   task.on('error', (e) => {
-                    nawah.log(
+                    nawah._log(
+                      nawah,
+                      config,
                       'log',
                       'File upload error....',
                       e.responseCode,
@@ -149,7 +196,13 @@ export class NawahNS extends NawahBase {
           }
         }
 
-        nawah.log('log', 'Populated filesObservables:', filesUploads);
+        nawah._log(
+          nawah,
+          config,
+          'log',
+          'Populated filesObservables:',
+          filesUploads
+        );
 
         return filesUploads;
       },
