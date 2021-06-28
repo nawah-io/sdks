@@ -1,24 +1,19 @@
-import * as rs from 'jsrsasign';
 import {
-    combineLatest,
-    interval,
-    Observable,
-    Subject,
-    Subscription
+  combineLatest,
+  interval,
+  Observable,
+  Subject,
+  Subscription
 } from 'rxjs';
 import {
-    CallArgs,
-    Doc,
-    Query,
-    Res,
-    ResArgsDoc,
-    ResArgsMsg,
-    ResArgsSession,
-    SDKConfig,
-    Session
+  CallArgs,
+  Doc,
+  Query,
+  Require,
+  Res,
+  SDKConfig,
+  Session
 } from './nawah.models';
-
-const JWS = rs.KJUR.jws.JWS;
 
 export enum INIT_STATE {
   NOT_INITED = 'NOT_INITED',
@@ -46,10 +41,10 @@ export class NawahBase {
       if (this.inited == INIT_STATE.INITED && this.heartbeatActive) {
         this.call({ endpoint: 'heart/beat' }).subscribe({
           complete: () => {
-            this.log('log', 'heart beat complete..');
+            this._log(this, this.#config, 'log', 'heart beat complete..');
           },
           error: () => {
-            this.log('log', 'heart beat ....');
+            this._log(this, this.#config, 'log', 'heart beat ....');
           },
         });
       }
@@ -73,11 +68,18 @@ export class NawahBase {
 
   session?: Session;
 
+  _log!: (
+    nawah: NawahBase,
+    config: SDKConfig,
+    level: 'log' | 'info' | 'warn' | 'error',
+    ...values: Array<unknown>
+  ) => void;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   _websocketInit!: (nawah: NawahBase, config: SDKConfig) => Subject<any>;
   _populateFilesUploads!: (
     nawah: NawahBase,
     config: SDKConfig,
-    callArgs: CallArgs
+    callArgs: Require<CallArgs, 'sid' | 'token' | 'doc'>
   ) => Array<Observable<Res<Doc>>>;
   _cacheSet!: (
     nawah: NawahBase,
@@ -85,8 +87,12 @@ export class NawahBase {
     key: string,
     value: string
   ) => void;
-  _cacheGet!: (nawah: NawahBase, config: SDKConfig, key: string) => any;
-  _cacheRemove!: (nawah: NawahBase, config: SDKConfig, key: string) =>void
+  _cacheGet!: (
+    nawah: NawahBase,
+    config: SDKConfig,
+    key: string
+  ) => string | undefined;
+  _cacheRemove!: (nawah: NawahBase, config: SDKConfig, key: string) => void;
   _generateJWT!: (
     nawah: NawahBase,
     config: SDKConfig,
@@ -94,14 +100,42 @@ export class NawahBase {
     token: string
   ) => string;
 
+  #cacheSession!: Session | undefined;
+  get cacheSession(): Session | undefined {
+    if (!this.#cacheSession) {
+      const cacheSessionStr = this._cacheGet(this, this.#config, 'session');
+      if (cacheSessionStr) {
+        this.#cacheSession = JSON.parse(cacheSessionStr);
+      }
+    }
+
+    return this.#cacheSession;
+  }
+  set cacheSession(session: Session | undefined) {
+    this.#cacheSession = session;
+
+    if (!session) {
+      this._cacheRemove(this, this.#config, 'session');
+      return;
+    }
+
+    this._cacheSet(this, this.#config, 'session', JSON.stringify(session));
+  }
+
   constructor(
     callables: {
+      log?: (
+        nawah: NawahBase,
+        config: SDKConfig,
+        level: 'log' | 'info' | 'warn' | 'error',
+        ...values: Array<unknown>
+      ) => void;
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       websocketInit?: (nawah: NawahBase, config: SDKConfig) => Subject<any>;
       populateFilesUploads?: (
         nawah: NawahBase,
         config: SDKConfig,
-        callArgs: CallArgs
+        callArgs: Require<CallArgs, 'sid' | 'token' | 'doc'>
       ) => Array<Observable<Res<Doc>>>;
       cacheSet?: (
         nawah: NawahBase,
@@ -123,6 +157,9 @@ export class NawahBase {
       ) => string;
     } = {}
   ) {
+    if (callables.log) {
+      this._log = callables.log;
+    }
     if (callables.websocketInit) {
       this._websocketInit = callables.websocketInit;
     }
@@ -147,20 +184,30 @@ export class NawahBase {
         this.inited = init;
         if (init == INIT_STATE.INITED) {
           if (this.#queue.noAuth) {
-            this.log(
+            this._log(
+              this,
+              this.#config,
               'info',
               'Found calls in noAuth queue:',
               this.#queue.noAuth
             );
           }
           for (const call of this.#queue.noAuth) {
-            this.log('info', 'processing noAuth call: ', call);
+            this._log(
+              this,
+              this.#config,
+              'info',
+              'processing noAuth call: ',
+              call
+            );
             combineLatest(call.subject).subscribe({
               complete: () => {
                 // [DOC] Set callArgs sid, token as these values are were not present when the call was queued
                 call.callArgs.sid = 'f00000000000000000000012';
                 call.callArgs.token = this.#config.anonToken;
-                this.log(
+                this._log(
+                  this,
+                  this.#config,
                   'info',
                   'sending noAuth queue request as JWT token:',
                   call.callArgs,
@@ -177,7 +224,9 @@ export class NawahBase {
                 });
               },
               error: (err) => {
-                this.log(
+                this._log(
+                  this,
+                  this.#config,
                   'error',
                   'Received error on fileSubject/filesSubjects: ',
                   err
@@ -195,16 +244,30 @@ export class NawahBase {
         this.authed = auth;
         if (auth == AUTH_STATE.AUTHED) {
           if (this.#queue.noAuth) {
-            this.log('info', 'Found calls in auth queue:', this.#queue.auth);
+            this._log(
+              this,
+              this.#config,
+              'info',
+              'Found calls in auth queue:',
+              this.#queue.auth
+            );
           }
           for (const call of this.#queue.auth) {
-            this.log('info', 'processing auth call: ', call);
+            this._log(
+              this,
+              this.#config,
+              'info',
+              'processing auth call: ',
+              call
+            );
             combineLatest(call.subject).subscribe({
               complete: () => {
                 // [DOC] Set callArgs sid, token as these values are were not present when the call was queued
                 call.callArgs.sid = this.session?._id;
                 call.callArgs.token = this.session?.token;
-                this.log(
+                this._log(
+                  this,
+                  this.#config,
                   'info',
                   'sending auth queue request as JWT token:',
                   call.callArgs,
@@ -221,7 +284,9 @@ export class NawahBase {
                 });
               },
               error: (err) => {
-                this.log(
+                this._log(
+                  this,
+                  this.#config,
                   'error',
                   'Received error on fileSubject/filesSubjects: ',
                   err
@@ -235,11 +300,6 @@ export class NawahBase {
     });
   }
 
-  log(level: 'log' | 'info' | 'warn' | 'error', ...data: Array<unknown>): void {
-    if (!this.#config?.debug) return;
-    console[level](...data);
-  }
-
   init(config: SDKConfig): Observable<Res<Doc>> {
     if (!config.api.startsWith('ws://') && !config.api.startsWith('wss://')) {
       throw new Error('SDK api is invalid');
@@ -250,17 +310,17 @@ export class NawahBase {
     config.debug ??= false;
     config.cacheKey ??= Math.random().toString(36).substring(7);
     this.#config = config;
-    this.log('log', 'Resetting SDK before init');
+    this._log(this, this.#config, 'log', 'Resetting SDK before init');
     this.reset();
     this.#subject = this._websocketInit(this, this.#config);
 
-    this.log('log', 'Attempting to connect');
+    this._log(this, this.#config, 'log', 'Attempting to connect');
 
     this.#subject.subscribe({
       next: (res: Res<Doc>) => {
-        this.log('log', 'Received new message:', res);
+        this._log(this, this.#config, 'log', 'Received new message:', res);
         this.#conn.next(res);
-        if ((res.args as ResArgsMsg)?.code == 'CORE_CONN_READY') {
+        if (res.args.code == 'CORE_CONN_READY') {
           this.reset();
           this.#config.anonToken = config.anonToken;
           this.call({
@@ -269,50 +329,35 @@ export class NawahBase {
             token: this.#config.anonToken,
             doc: { app: config.appId },
           }).subscribe();
-        } else if ((res.args as ResArgsMsg)?.code == 'CORE_CONN_OK') {
+        } else if (res.args.code == 'CORE_CONN_OK') {
           this.inited$.next(INIT_STATE.INITED);
-        } else if ((res.args as ResArgsMsg)?.code == 'CORE_CONN_CLOSED') {
+        } else if (res.args.code == 'CORE_CONN_CLOSED') {
           this.reset();
-        } else if ((res.args as ResArgsSession)?.session) {
-          this.log('log', 'Response has session obj');
-          if (
-            (res.args as ResArgsSession)?.session._id ==
-            'f00000000000000000000012'
-          ) {
+        } else if (res.args.session) {
+          this._log(this, this.#config, 'log', 'Response has session obj');
+          if (res.args.session._id == 'f00000000000000000000012') {
             if (this.authed == AUTH_STATE.AUTHED) {
               this.session = undefined;
               this.authed$.next(AUTH_STATE.NOT_AUTHED);
             }
 
-            this._cacheRemove(this, this.#config, 'token');
-            this._cacheRemove(this, this.#config, 'sid');
-            this.log('log', 'Session is null');
+            this.cacheSession = undefined;
+            this._log(this, this.#config, 'log', 'Session is null');
           } else {
-            this._cacheSet(
-              this,
-              this.#config,
-              'sid',
-              (res.args as ResArgsSession)?.session._id
-            );
-            this._cacheSet(
-              this,
-              this.#config,
-              'token',
-              (res.args as ResArgsSession)?.session.token
-            );
-            this.session = (res.args as ResArgsSession)?.session;
+            this.cacheSession = res.args.session;
+            this.session = res.args.session;
             this.authed$.next(AUTH_STATE.AUTHED);
-            this.log('log', 'Session updated');
+            this._log(this, this.#config, 'log', 'Session updated');
           }
         }
       },
       error: (err: Res<Doc>) => {
-        this.log('log', 'Received error:', err);
+        this._log(this, this.#config, 'log', 'Received error:', err);
         this.#conn.error(err);
         this.reset(true);
       },
       complete: () => {
-        this.log('log', 'Connection clean-closed');
+        this._log(this, this.#config, 'log', 'Connection clean-closed');
         this.reset();
       },
     });
@@ -338,20 +383,22 @@ export class NawahBase {
         this.authed$.next(AUTH_STATE.NOT_AUTHED);
       }
     } catch (error) {
-      this.log('error', 'Unexpected error while resetting SDK.', error);
+      this._log(
+        this,
+        this.#config,
+        'error',
+        'Unexpected error while resetting SDK.',
+        error
+      );
     }
   }
 
   call<T extends Doc>(callArgs: CallArgs): Observable<Res<T>> {
     if (this.authed == AUTH_STATE.AUTHED) {
       callArgs.sid =
-        callArgs.sid ||
-        this._cacheGet(this, this.#config, 'sid') ||
-        'f00000000000000000000012';
+        callArgs.sid || this.cacheSession?._id || 'f00000000000000000000012';
       callArgs.token =
-        callArgs.token ||
-        this._cacheGet(this, this.#config, 'token') ||
-        this.#config.anonToken;
+        callArgs.token || this.cacheSession?.token || this.#config.anonToken;
     } else if (this.inited == INIT_STATE.INITED) {
       callArgs.sid = callArgs.sid || 'f00000000000000000000012';
       callArgs.token = callArgs.token || this.#config.anonToken;
@@ -361,12 +408,12 @@ export class NawahBase {
     callArgs.awaitAuth = callArgs.awaitAuth || false;
     callArgs.call_id = Math.random().toString(36).substring(7);
 
-    this.log('log', 'callArgs', callArgs);
+    this._log(this, this.#config, 'log', 'callArgs', callArgs);
 
     const filesUploads = this._populateFilesUploads(
       this,
       this.#config,
-      callArgs
+      callArgs as Require<CallArgs, 'sid' | 'token' | 'doc'>
     );
 
     if (
@@ -378,10 +425,18 @@ export class NawahBase {
     ) {
       combineLatest(filesUploads).subscribe({
         error: (err) => {
-          this.log('error', 'Received error on filesSubjects:', err);
+          this._log(
+            this,
+            this.#config,
+            'error',
+            'Received error on filesSubjects:',
+            err
+          );
         },
         complete: () => {
-          this.log(
+          this._log(
+            this,
+            this.#config,
             'log',
             'sending request as JWT token:',
             callArgs,
@@ -399,15 +454,21 @@ export class NawahBase {
         },
       });
     } else {
-      this.log('warn', 'SDK not yet inited. Queuing call:', callArgs);
+      this._log(
+        this,
+        this.#config,
+        'warn',
+        'SDK not yet inited. Queuing call:',
+        callArgs
+      );
       if (callArgs.awaitAuth) {
-        this.log('warn', 'Queuing in auth queue.');
+        this._log(this, this.#config, 'warn', 'Queuing in auth queue.');
         this.#queue.auth.push({
           subject: filesUploads,
           callArgs: callArgs,
         });
       } else {
-        this.log('warn', 'Queuing in noAuth queue.');
+        this._log(this, this.#config, 'warn', 'Queuing in noAuth queue.');
         this.#queue.noAuth.push({
           subject: filesUploads,
           callArgs: callArgs,
@@ -418,8 +479,10 @@ export class NawahBase {
     const call = new Observable<Res<T>>((observer) => {
       const observable = this.#conn.subscribe({
         next: (res: Res<Doc>) => {
-          if ((res.args as ResArgsDoc<Doc>)?.call_id == callArgs.call_id) {
-            this.log(
+          if (res.args.call_id == callArgs.call_id) {
+            this._log(
+              this,
+              this.#config,
               'log',
               'message received from observer on call_id:',
               res,
@@ -431,8 +494,10 @@ export class NawahBase {
               observer.error(res);
             }
 
-            if (!(res.args as ResArgsDoc).watch) {
-              this.log(
+            if (!res.args.watch) {
+              this._log(
+                this,
+                this.#config,
                 'log',
                 'completing the observer with call_id:',
                 res.args.call_id
@@ -441,7 +506,13 @@ export class NawahBase {
               observer.unsubscribe();
               observable.unsubscribe();
             } else {
-              this.log('log', 'Detected watch with call_id:', res.args.call_id);
+              this._log(
+                this,
+                this.#config,
+                'log',
+                'Detected watch with call_id:',
+                res.args.call_id
+              );
             }
           }
         },
@@ -465,7 +536,7 @@ export class NawahBase {
     });
     call.subscribe({
       error: (err: Res<Doc>) => {
-        this.log('error', 'deleteWatch call err:', err);
+        this._log(this, this.#config, 'error', 'deleteWatch call err:', err);
       },
     });
     return call;
@@ -517,7 +588,7 @@ export class NawahBase {
     call.subscribe({
       error: (err: Res<Doc>) => {
         this.authed$.next(AUTH_STATE.AUTHING);
-        this.log('error', 'auth call err:', err);
+        this._log(this, this.#config, 'error', 'auth call err:', err);
       },
     });
     return call;
@@ -528,8 +599,12 @@ export class NawahBase {
     token?: string,
     groups?: Array<string>
   ): Observable<Res<Doc>> {
-    sid ??= this._cacheGet(this, this.#config, 'sid');
-    token ??= this._cacheGet(this, this.#config, 'token');
+    sid ??= this.cacheSession?._id;
+    token ??= this.cacheSession?.token;
+
+    if (!sid || !token) {
+      throw Error('No credentials cached or provided.');
+    }
 
     this.authed$.next(AUTH_STATE.AUTHING);
     const query: Query = [
@@ -546,9 +621,8 @@ export class NawahBase {
     });
     call.subscribe({
       error: (err: Res<Session>) => {
-        this.log('error', 'reauth call err:', err);
-        this._cacheRemove(this, this.#config, 'token');
-        this._cacheRemove(this, this.#config, 'sid');
+        this._log(this, this.#config, 'error', 'reauth call err:', err);
+        this.cacheSession = undefined;
         this.session = undefined;
         this.authed$.next(AUTH_STATE.NOT_AUTHED);
       },
@@ -565,14 +639,14 @@ export class NawahBase {
     });
     call.subscribe({
       error: (err: Res<Doc>) => {
-        this.log('error', 'signout call err:', err);
+        this._log(this, this.#config, 'error', 'signout call err:', err);
       },
     });
     return call;
   }
 
   checkAuth(groups?: Array<string>): Observable<Res<Doc>> {
-    this.log('log', 'attempting checkAuth');
+    this._log(this, this.#config, 'log', 'attempting checkAuth');
 
     const call = this.reauth(undefined, undefined, groups);
     return call;
