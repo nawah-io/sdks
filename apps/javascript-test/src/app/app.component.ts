@@ -75,6 +75,7 @@ export class AppComponent implements OnInit {
         anonToken: this.anonToken,
         authAttrs: ['email'],
         appId: 'TEST_APP',
+        cacheKey: 'DEFAULT',
         debug: true,
       })
       .pipe(
