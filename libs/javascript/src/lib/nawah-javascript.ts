@@ -1,16 +1,25 @@
 import { generateJWT, populateFilesUploads, websocketInit } from './funcs';
 import { NawahBase } from './nawah-base';
-import { CallArgs, SDKConfig } from './nawah.models';
+import { CallArgs, Require, SDKConfig } from './nawah.models';
 
 export class NawahJS extends NawahBase {
   constructor() {
     super({
+      log: (
+        nawah: NawahJS,
+        config: SDKConfig,
+        level: 'log' | 'info' | 'warn' | 'error',
+        ...values: Array<unknown>
+      ) => {
+        if (!config?.debug) return;
+        console[level](...values);
+      },
       websocketInit: (nawah: NawahJS, config: SDKConfig) =>
         websocketInit(nawah, config),
       populateFilesUploads: (
         nawah: NawahJS,
         config: SDKConfig,
-        callArgs: CallArgs
+        callArgs: Require<CallArgs, 'sid' | 'token' | 'doc'>
       ) => populateFilesUploads(nawah, config, callArgs),
       cacheSet: (
         nawah: NawahJS,
